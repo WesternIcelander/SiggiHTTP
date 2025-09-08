@@ -180,7 +180,7 @@ public class HTTPResponse extends OutputStream {
 			List<String> rangeETag = request.headers.get("If-Range");
 			if (rangeETag != null && !rangeETag.isEmpty()) {
 				String theETag = rangeETag.get(0);
-				if (theETag.equals(eTag) || theETag.equals("\"" + eTag + "\"")) {
+				if (!theETag.equals(eTag) && !theETag.equals("\"" + eTag + "\"")) {
 					partialContent = false;
 				}
 			}
