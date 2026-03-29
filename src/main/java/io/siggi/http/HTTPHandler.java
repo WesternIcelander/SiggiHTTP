@@ -288,6 +288,7 @@ final class HTTPHandler {
 		try {
 			theLoop:
 			while (keepAlive && !mustEndConnection) {
+				boolean send408 = false;
 				try {
 					cleanupIsExplicit = false;
 					cleanedUpOnHandlerThread = false;
@@ -299,6 +300,7 @@ final class HTTPHandler {
 					keepAlive = false;
 					resetHeaders();
 					String request = "";
+					send408 = true;
 					try {
 						while (request.trim().equals("")) {
 							if (keepAliveTime != -1) {
@@ -314,6 +316,7 @@ final class HTTPHandler {
 						requestUriTooBig();
 						break;
 					}
+					send408 = false;
 					int s = request.indexOf(" ");
 					if (s == -1) {
 						s = request.length();
@@ -324,6 +327,15 @@ final class HTTPHandler {
 					processRequest(request);
 				} catch (SocketTimeoutException | HTTPTimedOutException ste) {
 					// Timed out
+					if (send408) {
+						try {
+							setHeader("408 Request Timeout");
+							setHeader("Content-Length", "0");
+							setHeader("Connection", "close");
+							writeHeaders();
+						} catch (Exception ignored) {
+						}
+					}
 					keepAlive = false;
 				} catch (Exception e) {
 					/*System.err.print("Server error (500 sent to client): ");
