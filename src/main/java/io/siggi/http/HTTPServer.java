@@ -7,6 +7,7 @@ import io.siggi.http.session.Sessions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -80,9 +81,9 @@ public final class HTTPServer {
 	 * Handle the socket. This method will start a new Thread.
 	 *
 	 * @param socket The Socket to use
-	 * @throws java.io.IOException if something goes wrong
+	 * @throws java.io.UncheckedIOException if something goes wrong
 	 */
-	public void handle(Socket socket) throws IOException {
+	public void handle(Socket socket) {
 		handle(socket, null);
 	}
 
@@ -94,13 +95,17 @@ public final class HTTPServer {
 	 *
 	 * @param socket The Socket to use
 	 * @param preRead The InputStream containing bytes you already read
-	 * @throws java.io.IOException if something goes wrong
+	 * @throws java.io.UncheckedIOException if something goes wrong
 	 */
-	public void handle(Socket socket, InputStream preRead) throws IOException {
+	public void handle(Socket socket, InputStream preRead) {
 		if (!startedProcessing) {
 			startedProcessing = true;
 		}
-		new HTTPHandler(this, socket, preRead, executor).start();
+		try {
+			new HTTPHandler(this, socket, preRead, executor).start();
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	/**
