@@ -18,74 +18,82 @@ import java.util.Map;
  */
 public class HTTPRequest {
 
+	/**
+	 * @deprecated Use {@link #server()} instead.
+	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final HTTPServer server;
 
 	final HTTPHandler handler;
 	/**
-	 * The object to send responses to. This object extends
-	 * <code>OutputStream</code> so you can send data here.
+	 * @deprecated Use {@link #openResponse()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final HTTPResponse response;
 	/**
-	 * The HTTP request method.
+	 * @deprecated Use {@link #method()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String method;
 	/**
-	 * The decoded form of the path of the requested URI. The query string is
-	 * not included.
+	 * @deprecated Use {@link #path()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String url;
 	/**
-	 * The decoded form of the path of the requested URI. The query string is
-	 * also included.
+	 * @deprecated Use {@link #rawPath()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String fullUrl;
 	/**
-	 * The data passed in the query string. This may be content from a form
-	 * submitted with the <code>GET</code> method.
+	 * @deprecated Use {@link #get()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final Map<String, String> get;
 	/**
-	 * The data passed in the content data. This may be content from a form
-	 * submitted with the <code>POST</code> method.
+	 * @deprecated Use {@link #post()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final Map<String, String> post;
 	/**
-	 * The data passed in the Cookies header.
+	 * @deprecated Use {@link #cookies()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final Map<String, String> cookies;
 	/**
-	 * The HTTP request headers
+	 * @deprecated Use {@link #headers()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final Map<String, List<String>> headers;
 	/**
-	 * The files uploaded. Files will only appear in this list if form
-	 * enctype="multipart/form-data" and form is submitted with POST.
+	 * @deprecated Use {@link #uploadedFiles()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final Map<String, UploadedFile> uploadedFiles;
 	/**
-	 * The data in the Host request header.
+	 * @deprecated Use {@code getHeader("Host")} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String host;
 	/**
-	 * The page that referred the client to this page.
+	 * @deprecated Use {@code getHeader("Referer")} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String referer;
 	/**
-	 * The user agent of the browser requesting the page.
+	 * @deprecated Use {@code getHeader("User-Agent")} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String userAgent;
 	/**
-	 * Post data exactly as it was sent to the server.
-	 * (application/x-www-form-urlencoded only)
+	 * @deprecated Use {@link #postData()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final String postData;
 	/**
-	 * Input Stream for post data other than application/x-www-form-urlencoded
-	 * and multipart/form-data. This is null if server processed postdata by
-	 * itself. You SHOULD completely read from this stream before writing a
-	 * response!
+	 * @deprecated Use {@link #inputStream()} instead.
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public final InputStream inStream;
 
 	/**
@@ -313,6 +321,87 @@ public class HTTPRequest {
 		}
 		handler.makeCleanupExplicit();
 		return response;
+	}
+
+	/**
+	 * Get the HTTPServer that received this request.
+	 */
+	public HTTPServer server() {
+		return server;
+	}
+
+	/**
+	 * Get the HTTP method used for this request.
+	 */
+	public String method() {
+		return method;
+	}
+
+	/**
+	 * Get the path for this request.
+	 */
+	public String path() {
+		return url;
+	}
+
+	/**
+	 * Get the raw path string for this request.
+	 */
+	public String rawPath() {
+		return fullUrl;
+	}
+
+	/**
+	 * Get the query parameters for this request.
+	 */
+	public Map<String, String> get() {
+		return get;
+	}
+
+	/**
+	 * Get the post parameters for this request. May be null if the request body was not parsed yet or if it may be read
+	 * another way such as with {@link #inputStream()}.
+	 */
+	public Map<String, String> post() {
+		return post;
+	}
+
+	/**
+	 * Get the cookies sent with this request.
+	 */
+	public Map<String, String> cookies() {
+		return cookies;
+	}
+
+	/**
+	 * Get the headers sent with this request.
+	 */
+	public Map<String, List<String>> headers() {
+		return headers;
+	}
+
+	/**
+	 * Get the files uploaded with this request. May be null if the request body was not parsed yet or if it may be read
+	 * another way such as with {@link #inputStream()}.
+	 */
+	public Map<String, UploadedFile> uploadedFiles() {
+		return uploadedFiles;
+	}
+
+	/**
+	 * Get the raw post data sent with this request. In cases other than when the Content-Type is
+	 * application/x-www-form-urlencoded, this will always be null. May be null if the request body was not parsed yet
+	 * or if it may be read another way such as with {@link #inputStream()}.
+	 */
+	public String postData() {
+		return postData;
+	}
+
+	/**
+	 * Get the request body stream. This may be null if the request body was already parsed.
+	 */
+	public InputStream inputStream() {
+		return inStream;
 	}
 
 	/**
