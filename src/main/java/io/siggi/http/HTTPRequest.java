@@ -1,11 +1,14 @@
 package io.siggi.http;
 
+import io.siggi.http.exception.EndResponse;
 import io.siggi.http.session.Session;
 import io.siggi.http.session.Sessions;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -310,5 +313,43 @@ public class HTTPRequest {
 		}
 		handler.makeCleanupExplicit();
 		return response;
+	}
+
+	/**
+	 * Specify what methods are allowed. If the request is OPTIONS or a method not on the list, an appropriate response
+	 * is generated and EndResponse is thrown, otherwise this method does not do anything else.
+	 */
+	public void allowedMethods(String... methods) throws IOException, EndResponse {
+		allowedMethods(Arrays.asList(methods));
+	}
+
+	/**
+	 * Specify what methods are allowed. If the request is OPTIONS or a method not on the list, an appropriate response
+	 * is generated and EndResponse is thrown, otherwise this method does not do anything else.
+	 */
+	public void allowedMethods(List<String> methods) throws IOException, EndResponse {
+		String checkedMethod = this.method;
+		if (checkedMethod.equals("HEAD")) checkedMethod = "GET";
+		boolean allowedMethod = false;
+		boolean options = false;
+		if (checkedMethod.equals("OPTIONS")) {
+			allowedMethod = true;
+			options = true;
+		} else {
+			for (String method : methods) {
+				if (method.equals(checkedMethod)) {
+					allowedMethod = true;
+				}
+			}
+		}
+		if (!allowedMethod || options) {
+			try (HTTPResponse response = openResponse()) {
+				response.setHeader(options ? "200 OK" : "405 Method Not Allowed");
+				response.setHeader("Allow", String.join(", ", methods));
+				response.contentLength(0);
+				response.sendHeaders();
+			}
+			throw EndResponse.get();
+		}
 	}
 }
