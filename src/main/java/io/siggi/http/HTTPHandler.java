@@ -1,6 +1,7 @@
 package io.siggi.http;
 
 import io.siggi.http.defaultresponders.DefaultResponder;
+import io.siggi.http.exception.EndResponse;
 import io.siggi.http.exception.TooBigException;
 import io.siggi.http.io.ChunkedInputStream;
 import io.siggi.http.io.ChunkedOutputStream;
@@ -51,7 +52,10 @@ final class HTTPHandler {
 	private void processHTTP(HTTPRequest request) throws Exception {
 		HTTPResponder responder = server.getResponderRegistry(request.host).getResponder(request.url);
 		if (responder != null) {
-			responder.respond(request);
+			try {
+				responder.respond(request);
+			} catch (EndResponse ignored) {
+			}
 			if (noAutoClose && cannotKeepAlive) {
 				return;
 			}
@@ -78,7 +82,10 @@ final class HTTPHandler {
 			}
 			setHeader("404 Not Found");
 			if (responder != null) {
-				responder.respond404(request);
+				try {
+					responder.respond404(request);
+				} catch (EndResponse ignored) {
+				}
 				if (wrote) {
 					finishBody();
 					return;
