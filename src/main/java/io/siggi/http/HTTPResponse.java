@@ -396,6 +396,7 @@ public class HTTPResponse extends OutputStream {
 	@Override
 	public void close() throws IOException {
 		if (closed) return;
+		if (!alreadyWrote()) sendHeaders();
 		markClosed();
 		request.handler.closeRequest();
 	}

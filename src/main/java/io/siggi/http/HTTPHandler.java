@@ -60,7 +60,8 @@ final class HTTPHandler {
 				return;
 			}
 		}
-		handlePostRequest(request, responder);
+		if (!cleanupIsExplicit)
+			handlePostRequest(request, responder);
 	}
 
 	private void handlePostRequest(HTTPRequest request, HTTPResponder responder) throws Exception {
@@ -126,7 +127,8 @@ final class HTTPHandler {
 			if (contentOutStream instanceof BufferedOutputStream) {
 				contentOutStream.flush();
 			}
-			chunkOutputStream.close();
+			if (chunkOutputStream != null)
+				chunkOutputStream.close();
 		} else if (writtenBodyLength < outputContentLength) {
 			// website code didn't write the whole body
 			// just pad it with zeroes
@@ -395,8 +397,9 @@ final class HTTPHandler {
 		cleanupIsExplicit = true;
 	}
 
-	void closeRequest() {
+	void closeRequest() throws IOException {
 		cleanupIsExplicit = true;
+		finishBody();
 		postRequestCleanup();
 		if (Thread.currentThread() == handlerThread) {
 			cleanedUpOnHandlerThread = true;
