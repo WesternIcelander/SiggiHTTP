@@ -131,7 +131,7 @@ final class HTTPHandler {
 				chunkOutputStream.close();
 		} else if (writtenBodyLength < outputContentLength) {
 			// website code didn't write the whole body
-			// just pad it with zeroes
+			// this cannot be recovered from, so we must close the connection
 			mustEndConnection = true;
 			if (contentOutStream instanceof BufferedOutputStream) {
 				contentOutStream.flush();
