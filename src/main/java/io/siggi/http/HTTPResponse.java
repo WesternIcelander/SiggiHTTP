@@ -121,6 +121,7 @@ public class HTTPResponse extends OutputStream {
 				break;
 				default: {
 					setHeader("405 Method Not Allowed");
+					setHeader("Allow", "OPTIONS, GET, HEAD");
 					setContentType("text/plain");
 					write("405 Method Not Allowed");
 				}
@@ -293,6 +294,7 @@ public class HTTPResponse extends OutputStream {
 			break;
 			default: {
 				setHeader("405 Method Not Allowed");
+				setHeader("Allow", "OPTIONS, GET, HEAD, PUT, DELETE");
 				setContentType("text/plain");
 				write("405 Method Not Allowed");
 			}
