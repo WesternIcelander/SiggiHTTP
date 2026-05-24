@@ -399,6 +399,7 @@ public class HTTPResponse extends OutputStream {
 	public void close() throws IOException {
 		if (closed) return;
 		if (!alreadyWrote()) sendHeaders();
+		request.handler.makeCleanupExplicit();
 		markClosed();
 		request.handler.closeRequest();
 	}
