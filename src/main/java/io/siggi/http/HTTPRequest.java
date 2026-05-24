@@ -26,9 +26,8 @@ public class HTTPRequest {
 
 	final HTTPHandler handler;
 	/**
-	 * @deprecated Use {@link #openResponse()} instead.
+	 * The response object that responses should be written to.
 	 */
-	@Deprecated(since = "1.10", forRemoval = true)
 	public final HTTPResponse response;
 	/**
 	 * @deprecated Use {@link #method()} instead.
