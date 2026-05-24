@@ -304,15 +304,12 @@ public class HTTPRequest {
 	}
 
 	/**
-	 * Open (or if already opened, returns the previously opened one) an HTTP response for this request. The first
-	 * call must be done on the Thread the request originated on. When a response is opened using this method instead
-	 * of accessing the {@link #response} field, the response will not be automatically closed, the response must be
-	 * explicitly closed when it is finished. This means you can return from the
-	 * {@link HTTPResponder#respond(HTTPRequest)} method before the request is complete and hand off the request to a
-	 * different thread. Take care to eventually close the response and not leave it dangling if your program ends up
-	 * in an error state.
+	 * Return the HTTP response associated with this request and requires it to be explicitly closed. This means you can
+	 * return from the {@link HTTPResponder#respond(HTTPRequest)} method before the request is complete and hand off the
+	 * request to a different thread. Take care to eventually close the response and not leave it dangling if your
+	 * program ends up in an error state.
 	 *
-	 * @return
+	 * @throws IOException if the response was already closed.
 	 */
 	public HTTPResponse openResponse() throws IOException {
 		if (response.isClosed()) {
@@ -320,6 +317,15 @@ public class HTTPRequest {
 		}
 		handler.makeCleanupExplicit();
 		return response;
+	}
+
+	/**
+	 * Require the response to be explicitly closed, so that the request may be passed to another thread to write a
+	 * response, possibly after you return from the {@link HTTPResponder#respond(HTTPRequest)} method.
+	 */
+	public HTTPRequest makeCleanupExplicit() {
+		handler.makeCleanupExplicit();
+		return this;
 	}
 
 	/**
