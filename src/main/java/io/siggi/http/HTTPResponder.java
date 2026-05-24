@@ -7,9 +7,9 @@ package io.siggi.http;
 public interface HTTPResponder {
 
 	/**
-	 * Page generators should generate the full HTTP response including the HTTP
-	 * response headers. (Yes that includes the very top header which indicates
-	 * the status code)
+	 * This method is called when a request is received and the request is included in this responder's scope. If the
+	 * responder intends to pass the request to another thread, it should call {@link HTTPRequest#makeCleanupExplicit()}
+	 * before returning.
 	 *
 	 * @param request the request to handle
 	 * @throws Exception if something goes wrong
@@ -17,8 +17,7 @@ public interface HTTPResponder {
 	public void respond(HTTPRequest request) throws Exception;
 
 	/**
-	 * Respond 404 here. If you don't want to use a custom 404 page, and use the
-	 * server default instead, create a method that does nothing.
+	 * If no other responder responds, this method gets called.
 	 *
 	 * @param request the request to handle
 	 * @throws Exception if something goes wrong
