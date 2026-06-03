@@ -90,7 +90,7 @@ public class HTTPRequest {
 	@Deprecated(since = "1.10", forRemoval = true)
 	public final String postData;
 	/**
-	 * @deprecated Use {@link #inputStream()} instead.
+	 * @deprecated Use {@link #getInputStream()} instead.
 	 */
 	@Deprecated(since = "1.10", forRemoval = true)
 	public final InputStream inStream;
@@ -365,7 +365,7 @@ public class HTTPRequest {
 
 	/**
 	 * Get the post parameters for this request. May be null if the request body was not parsed yet or if it may be read
-	 * another way such as with {@link #inputStream()}.
+	 * another way such as with {@link #getInputStream()}.
 	 */
 	public Map<String, String> post() {
 		return post;
@@ -387,7 +387,7 @@ public class HTTPRequest {
 
 	/**
 	 * Get the files uploaded with this request. May be null if the request body was not parsed yet or if it may be read
-	 * another way such as with {@link #inputStream()}.
+	 * another way such as with {@link #getInputStream()}.
 	 */
 	public Map<String, UploadedFile> uploadedFiles() {
 		return uploadedFiles;
@@ -396,7 +396,7 @@ public class HTTPRequest {
 	/**
 	 * Get the raw post data sent with this request. In cases other than when the Content-Type is
 	 * application/x-www-form-urlencoded, this will always be null. May be null if the request body was not parsed yet
-	 * or if it may be read another way such as with {@link #inputStream()}.
+	 * or if it may be read another way such as with {@link #getInputStream()}.
 	 */
 	public String postData() {
 		return postData;
@@ -405,7 +405,7 @@ public class HTTPRequest {
 	/**
 	 * Get the request body stream. This may be null if the request body was already parsed.
 	 */
-	public InputStream inputStream() {
+	public InputStream getInputStream() {
 		return inStream;
 	}
 
