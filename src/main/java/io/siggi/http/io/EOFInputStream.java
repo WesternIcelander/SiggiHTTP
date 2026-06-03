@@ -68,6 +68,14 @@ public final class EOFInputStream extends InputStream {
 		in.close();
 	}
 
+	@Override
+	public int available() throws IOException {
+		if (eofSequence == null) {
+			return in.available();
+		}
+		return 0;
+	}
+
 	private final byte[] singleByte = new byte[1];
 
 	@Override
