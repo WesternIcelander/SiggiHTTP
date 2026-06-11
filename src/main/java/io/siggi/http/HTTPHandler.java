@@ -60,6 +60,9 @@ final class HTTPHandler {
 				return;
 			}
 		}
+		if (!request.response.alreadyWrote() && request.url.equals("*") && !request.method.equals("OPTIONS")) {
+			badRequest();
+		}
 		if (!cleanupIsExplicit)
 			handlePostRequest(request, responder);
 	}
@@ -577,7 +580,7 @@ final class HTTPHandler {
 			if (forceHost != null) {
 				host = forceHost;
 			}
-			if (!requestURI.startsWith("/")) {
+			if (!requestURI.startsWith("/") && !requestURI.equals("*")) {
 				badRequest();
 				return;
 			}
