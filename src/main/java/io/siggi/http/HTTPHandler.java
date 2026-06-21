@@ -498,6 +498,7 @@ final class HTTPHandler {
 			host = null;
 			userAgent = null;
 			String forceHost = null;
+			sock.setTcpNoDelay(true);
 			sock.setSoTimeout(60000);
 			try {
 				Util.readHeaders(in, headers, server.getHeaderSizeLimit());
