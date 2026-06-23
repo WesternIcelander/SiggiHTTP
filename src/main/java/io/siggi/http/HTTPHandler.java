@@ -208,8 +208,7 @@ final class HTTPHandler {
 		this.server = server;
 		this.sock = socket;
 		this.sourceSocket = sourceSocket;
-		rawIn = socket.getInputStream();
-		in = rawIn;
+		in = socket.getInputStream();
 		out = socket.getOutputStream();
 		realInetAddress = inetAddress = socket.getInetAddress();
 		ip = inetAddress.getHostAddress();
@@ -220,8 +219,7 @@ final class HTTPHandler {
 		this.server = server;
 		this.sock = socket;
 		this.sourceSocket = null;
-		rawIn = preRead == null ? socket.getInputStream() : new ConcatenatedInputStream(preRead, socket.getInputStream());
-		in = rawIn;
+		in = preRead == null ? socket.getInputStream() : new ConcatenatedInputStream(preRead, socket.getInputStream());
 		out = socket.getOutputStream();
 		realInetAddress = inetAddress = socket.getInetAddress();
 		ip = inetAddress.getHostAddress();
@@ -1019,15 +1017,14 @@ final class HTTPHandler {
 	private boolean bufferDisabled = false;
 	ChunkedOutputStream chunkOutputStream = null;
 	OutputStream contentOutStream = null;
-	private Socket sock = null;
-	private InputStream rawIn = null;
-	private InputStream in = null;
+	private final Socket sock;
+	private final InputStream in;
 	@Deprecated
-	ServerSocket sourceSocket = null;
-	private OutputStream out = null;
-	private InetAddress realInetAddress = null;
-	private InetAddress inetAddress = null;
-	String ip = null;
+	final ServerSocket sourceSocket;
+	private final OutputStream out;
+	private final InetAddress realInetAddress;
+	private InetAddress inetAddress;
+	String ip;
 	private boolean mustEndConnection = false;
 	private boolean noAutoClose = false;
 	private boolean keepAlive = true;
