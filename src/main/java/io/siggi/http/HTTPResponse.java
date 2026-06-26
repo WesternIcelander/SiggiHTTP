@@ -439,7 +439,7 @@ public class HTTPResponse extends OutputStream {
 	public void write(byte[] b, int off, int len) throws IOException {
 		throwIOIfClosed();
 		if (!request.handler.wrote) {
-			request.handler.writeHeaders();
+			request.handler.writeHeaders(len > 0);
 		}
 		request.handler.prewrite(len);
 		if (request.handler.usingHeadMethod || len <= 0) {
@@ -455,7 +455,7 @@ public class HTTPResponse extends OutputStream {
 	public void write(int b) throws IOException {
 		throwIOIfClosed();
 		if (!request.handler.wrote) {
-			request.handler.writeHeaders();
+			request.handler.writeHeaders(true);
 		}
 		request.handler.prewrite(1);
 		if (request.handler.usingHeadMethod) {
@@ -475,7 +475,7 @@ public class HTTPResponse extends OutputStream {
 	public void sendHeaders() throws IOException {
 		throwIOIfClosed();
 		if (!request.handler.wrote) {
-			request.handler.writeHeaders();
+			request.handler.writeHeaders(false);
 		}
 	}
 

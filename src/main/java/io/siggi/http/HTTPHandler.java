@@ -9,6 +9,7 @@ import io.siggi.http.io.ConcatenatedInputStream;
 import io.siggi.http.io.EOFInputStream;
 import io.siggi.http.io.ReadLimitInputStream;
 import io.siggi.http.io.SubInputStream;
+import io.siggi.http.io.ToggleableBufferedOutputStream;
 import io.siggi.http.registry.HTTPResponderRegistry;
 import io.siggi.http.util.CaseInsensitiveHashMap;
 import io.siggi.http.util.CloudFlare;
@@ -79,7 +80,7 @@ final class HTTPHandler {
 					byte[] pageBytes = getBytes(page);
 					setHeader("Content-Length", Integer.toString(pageBytes.length));
 					setHeader("Content-Type", "text/html; charset=utf-8");
-					writeHeaders();
+					writeHeaders(true);
 					contentOutStream.write(pageBytes);
 					return;
 				}
@@ -105,7 +106,7 @@ final class HTTPHandler {
 					setHeader("500 Internal Server Error");
 					setHeader("Content-Length", Integer.toString(pageBytes.length));
 					setHeader("Content-Type", "text/html; charset=utf-8");
-					writeHeaders();
+					writeHeaders(true);
 					contentOutStream.write(pageBytes);
 				}
 			}
@@ -154,7 +155,7 @@ final class HTTPHandler {
 		setHeader("Content-Length", Integer.toString(pageBytes.length));
 		setHeader("Content-Type", "text/html; charset=utf-8");
 		keepAlive(false);
-		writeHeaders();
+		writeHeaders(true);
 		out.write(pageBytes);
 	}
 
@@ -166,7 +167,7 @@ final class HTTPHandler {
 		setHeader("Content-Length", Integer.toString(pageBytes.length));
 		setHeader("Content-Type", "text/html; charset=utf-8");
 		keepAlive(false);
-		writeHeaders();
+		writeHeaders(true);
 		out.write(pageBytes);
 	}
 
@@ -178,7 +179,7 @@ final class HTTPHandler {
 		setHeader("Content-Length", Integer.toString(pageBytes.length));
 		setHeader("Content-Type", "text/html; charset=utf-8");
 		keepAlive(false);
-		writeHeaders();
+		writeHeaders(true);
 		out.write(pageBytes);
 	}
 
@@ -209,7 +210,8 @@ final class HTTPHandler {
 		this.sock = socket;
 		this.sourceSocket = sourceSocket;
 		in = socket.getInputStream();
-		out = socket.getOutputStream();
+		rawOut = socket.getOutputStream();
+		out = new ToggleableBufferedOutputStream(rawOut);
 		realInetAddress = inetAddress = socket.getInetAddress();
 		ip = inetAddress.getHostAddress();
 		this.executor = executor;
@@ -220,7 +222,8 @@ final class HTTPHandler {
 		this.sock = socket;
 		this.sourceSocket = null;
 		in = preRead == null ? socket.getInputStream() : new ConcatenatedInputStream(preRead, socket.getInputStream());
-		out = socket.getOutputStream();
+		rawOut = socket.getOutputStream();
+		out = new ToggleableBufferedOutputStream(rawOut);
 		realInetAddress = inetAddress = socket.getInetAddress();
 		ip = inetAddress.getHostAddress();
 		this.executor = executor;
@@ -342,7 +345,7 @@ final class HTTPHandler {
 							setHeader("408 Request Timeout");
 							setHeader("Content-Length", "0");
 							setHeader("Connection", "close");
-							writeHeaders();
+							writeHeaders(false);
 						} catch (Exception ignored) {
 						}
 					}
@@ -361,7 +364,7 @@ final class HTTPHandler {
 							setHeader("Content-Length", Integer.toString(pageBytes.length));
 							setHeader("Content-Type", "text/html; charset=utf-8");
 							setHeader("Connection", "close");
-							writeHeaders();
+							writeHeaders(true);
 							out.write(pageBytes);
 						} catch (Exception e2) {
 						}
@@ -911,18 +914,18 @@ final class HTTPHandler {
 		setHeader("Expires", expire);
 	}
 
-	void writeHeaders() throws IOException {
+	void writeHeaders(boolean delayFlush) throws IOException {
 		if (wrote) {
 			return;
 		}
 		wrote = true;
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		Util.writeCRLF("HTTP/1.1 " + responseHeader, baos);
+		out.startBuffering();
+		Util.writeCRLF("HTTP/1.1 " + responseHeader, out);
 		for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
 			String header = entry.getKey();
 			List<String> list = entry.getValue();
 			for (String str : list) {
-				Util.writeCRLF(header + ": " + str, baos);
+				Util.writeCRLF(header + ": " + str, out);
 				if (header.equalsIgnoreCase("Content-Length")) {
 					try {
 						outputContentLength = Long.parseLong(str);
@@ -931,8 +934,8 @@ final class HTTPHandler {
 				}
 			}
 		}
-		Util.writeCRLF("", baos);
-		write(baos.toByteArray());
+		Util.writeCRLF("", out);
+		out.stopBuffering(delayFlush);
 		OutputStream streamToUse;
 		if (chunked) {
 			streamToUse = chunkOutputStream = new ChunkedOutputStream(out);
@@ -1021,7 +1024,8 @@ final class HTTPHandler {
 	private final InputStream in;
 	@Deprecated
 	final ServerSocket sourceSocket;
-	private final OutputStream out;
+	private final OutputStream rawOut;
+	private final ToggleableBufferedOutputStream out;
 	private final InetAddress realInetAddress;
 	private InetAddress inetAddress;
 	String ip;
