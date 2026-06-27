@@ -123,7 +123,7 @@ public class HTTPResponse extends OutputStream {
 					setHeader("405 Method Not Allowed");
 					setHeader("Allow", "OPTIONS, GET, HEAD");
 					setContentType("text/plain");
-					write("405 Method Not Allowed");
+					send("405 Method Not Allowed");
 				}
 				break;
 			}
@@ -274,8 +274,7 @@ public class HTTPResponse extends OutputStream {
 					} else {
 						setHeader("500 Internal Server Error");
 						setContentType("text/plain");
-						sendHeaders();
-						write("The file was not saved. Please try again.");
+						send("The file was not saved. Please try again.");
 						return;
 					}
 				} finally {
@@ -296,7 +295,7 @@ public class HTTPResponse extends OutputStream {
 				setHeader("405 Method Not Allowed");
 				setHeader("Allow", "OPTIONS, GET, HEAD, PUT, DELETE");
 				setContentType("text/plain");
-				write("405 Method Not Allowed");
+				send("405 Method Not Allowed");
 			}
 			break;
 		}
@@ -423,6 +422,43 @@ public class HTTPResponse extends OutputStream {
 	}
 
 	/**
+	 * Send a string as a complete response. This method converts the string to UTF-8 and passes it to
+	 * {@link #send(byte[])}.
+	 *
+	 * @param string
+	 * @throws IOException
+	 */
+	public void send(String string) throws IOException {
+		write(string.getBytes(StandardCharsets.UTF_8));
+	}
+
+	/**
+	 * Send a byte array as a complete response. This method sets the Content-Length header to the length of the byte
+	 * array and writes out the byte array.
+	 *
+	 * @param bytes
+	 * @throws IOException
+	 */
+	public void send(byte[] bytes) throws IOException {
+		contentLength(bytes.length);
+		write(bytes);
+	}
+
+	/**
+	 * Writes <code>string</code> as UTF-8 to the output stream.
+	 */
+	public void write(String string) throws IOException {
+		write(getBytes(string));
+	}
+
+	/**
+	 * Formats the string as UTF-8 and returns it as a byte array.
+	 */
+	public byte[] getBytes(String str) {
+		return str.getBytes(StandardCharsets.UTF_8);
+	}
+
+	/**
 	 * Writes all bytes in <code>b</code>
 	 */
 	@Override
@@ -477,20 +513,6 @@ public class HTTPResponse extends OutputStream {
 		if (!request.handler.wrote) {
 			request.handler.writeHeaders(false);
 		}
-	}
-
-	/**
-	 * Writes <code>string</code> as UTF-8 to the output stream.
-	 */
-	public void write(String string) throws IOException {
-		write(getBytes(string));
-	}
-
-	/**
-	 * Formats the string as UTF-8 and returns it as a byte array.
-	 */
-	public byte[] getBytes(String str) {
-			return str.getBytes(StandardCharsets.UTF_8);
 	}
 
 	/**
