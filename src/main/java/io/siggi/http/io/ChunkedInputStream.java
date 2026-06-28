@@ -104,6 +104,12 @@ public final class ChunkedInputStream extends InputStream {
 			return readAmount;
 		}
 		remainingInChunk -= readAmount;
+		if (remainingInChunk == 0L) {
+			remainingInChunk = getChunkSize();
+			if (remainingInChunk == 0L) {
+				endOfStream = true;
+			}
+		}
 		return readAmount;
 	}
 
