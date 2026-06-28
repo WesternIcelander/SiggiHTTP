@@ -227,7 +227,7 @@ public class HTTPResponse extends OutputStream {
 					setHeader("Content-Type", contentType);
 				}
 				setHeader("Last-Modified", formatDate(file.lastModified()));
-				request.handler.disableBuffer();
+				request.handler.setBuffered(false);
 				sendHeaders();
 				int c = 0;
 				byte[] b = new byte[16384];
@@ -304,11 +304,24 @@ public class HTTPResponse extends OutputStream {
 	/**
 	 * Disable buffering for this response.
 	 *
+	 * @deprecated Use {@link HTTPResponse#setBuffered(boolean)} instead
 	 * @throws IOException if something goes wrong
 	 */
+	@Deprecated(since = "1.10", forRemoval = true)
 	public void disableBuffer() throws IOException {
+		setBuffered(false);
+	}
+
+	/**
+	 * Set whether the response is buffered. Disabling buffering does not guarantee that any buffered data is flushed
+	 * immediately -- if you need already written data to be flushed, you need to call {@link HTTPResponse#flush()}.
+	 *
+	 * @param buffered whether bytes get buffered before being sent
+	 * @throws IOException if an IO error occurs while changing buffering status
+	 */
+	public void setBuffered(boolean buffered) throws IOException {
 		throwIOIfClosed();
-		request.handler.disableBuffer();
+		request.handler.setBuffered(buffered);
 	}
 
 	/**

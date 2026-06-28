@@ -309,7 +309,7 @@ final class HTTPHandler {
 					wrote = false;
 					writtenBodyLength = 0L;
 					outputContentLength = -1L;
-					bufferDisabled = false;
+					responseBuffered = true;
 					keepAlive = false;
 					resetHeaders();
 					String request = "";
@@ -935,21 +935,26 @@ final class HTTPHandler {
 			}
 		}
 		Util.writeCRLF("", out);
-		out.stopBuffering(delayFlush);
-		OutputStream streamToUse;
 		if (chunked) {
-			streamToUse = chunkOutputStream = new ChunkedOutputStream(out, false);
+			out.stopBuffering(delayFlush);
+			contentOutStream = chunkOutputStream = new ChunkedOutputStream(out, false);
+			chunkOutputStream.setBuffering(responseBuffered);
 		} else {
-			streamToUse = out;
+			if (!responseBuffered) out.stopBuffering(delayFlush);
+			contentOutStream = out;
+			chunkOutputStream = null;
 		}
-		contentOutStream = bufferDisabled ? streamToUse : new BufferedOutputStream(streamToUse);
 	}
 
-	void disableBuffer() throws IOException {
-		bufferDisabled = true;
-		if (contentOutStream instanceof BufferedOutputStream) {
-			contentOutStream.flush();
-			contentOutStream = chunkOutputStream == null ? out : chunkOutputStream;
+	void setBuffered(boolean buffered) throws IOException {
+		responseBuffered = buffered;
+		if (!wrote) return;
+		if (chunkOutputStream != null) {
+			chunkOutputStream.setBuffering(responseBuffered);
+		} else if (responseBuffered) {
+			out.startBuffering();
+		} else {
+			out.stopBuffering();
 		}
 	}
 
@@ -1017,7 +1022,7 @@ final class HTTPHandler {
 	boolean wrote = false;
 	long writtenBodyLength = 0L;
 	long outputContentLength = -1L;
-	private boolean bufferDisabled = false;
+	private boolean responseBuffered = true;
 	ChunkedOutputStream chunkOutputStream = null;
 	OutputStream contentOutStream = null;
 	private final Socket sock;
