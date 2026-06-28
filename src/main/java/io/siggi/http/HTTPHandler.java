@@ -938,7 +938,7 @@ final class HTTPHandler {
 		out.stopBuffering(delayFlush);
 		OutputStream streamToUse;
 		if (chunked) {
-			streamToUse = chunkOutputStream = new ChunkedOutputStream(out);
+			streamToUse = chunkOutputStream = new ChunkedOutputStream(out, false);
 		} else {
 			streamToUse = out;
 		}
