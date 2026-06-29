@@ -935,7 +935,9 @@ final class HTTPHandler {
 			}
 		}
 		Util.writeCRLF("", out);
-		if (chunked) {
+		if (usingHeadMethod) {
+			out.stopBuffering(false);
+		} else if (chunked) {
 			out.stopBuffering(delayFlush);
 			contentOutStream = chunkOutputStream = new ChunkedOutputStream(out, false);
 			chunkOutputStream.setBuffering(responseBuffered);
