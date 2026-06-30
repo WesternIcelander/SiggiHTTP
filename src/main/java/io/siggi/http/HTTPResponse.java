@@ -442,7 +442,7 @@ public class HTTPResponse extends OutputStream {
 	 * @throws IOException
 	 */
 	public void send(String string) throws IOException {
-		write(string.getBytes(StandardCharsets.UTF_8));
+		send(string.getBytes(StandardCharsets.UTF_8));
 	}
 
 	/**
