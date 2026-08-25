@@ -519,11 +519,11 @@ final class HTTPHandler {
 							}
 
 							for (int i = forwardedFor.length - 1; i >= 0; i--) {
+								inetAddress = InetAddress.getByName(forwardedFor[i]);
+								ip = inetAddress.getHostAddress();
 								if (CloudFlare.isCloudFlare(forwardedFor[i]) || server.isIPTrusted(forwardedFor[i])) {
 									continue;
 								}
-								inetAddress = InetAddress.getByName(forwardedFor[i]);
-								ip = inetAddress.getHostAddress();
 								break;
 							}
 						}
