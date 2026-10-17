@@ -157,6 +157,7 @@ final class HTTPHandler {
 		keepAlive(false);
 		writeHeaders(true);
 		out.write(pageBytes);
+		out.flush();
 	}
 
 	private void requestUriTooBig() throws IOException {
@@ -169,6 +170,7 @@ final class HTTPHandler {
 		keepAlive(false);
 		writeHeaders(true);
 		out.write(pageBytes);
+		out.flush();
 	}
 
 	private void tooBig() throws IOException {
@@ -181,6 +183,7 @@ final class HTTPHandler {
 		keepAlive(false);
 		writeHeaders(true);
 		out.write(pageBytes);
+		out.flush();
 	}
 
 	private final List<File> purgeable = new LinkedList<>();
@@ -581,6 +584,11 @@ final class HTTPHandler {
 			}
 			if (forceHost != null) {
 				host = forceHost;
+			}
+			if (host == null && !httpVersion.equals("HTTP/1.0") && !httpVersion.equals("HTTP/0.9")) {
+				// Host is mandatory from HTTP/1.1 onwards (RFC 9112 section 3.2)
+				badRequest();
+				return;
 			}
 			if (!requestURI.startsWith("/") && !requestURI.equals("*")) {
 				badRequest();

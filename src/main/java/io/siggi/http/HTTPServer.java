@@ -297,6 +297,9 @@ public final class HTTPServer {
 	 * @return
 	 */
 	public final HTTPResponderRegistry getResponderRegistry(String hostname) {
+		if (hostname == null) {
+			return responderRegistry;
+		}
 		if (hostname.endsWith(":" + port)) {
 			hostname = hostname.substring(0, hostname.lastIndexOf(":"));
 		}
