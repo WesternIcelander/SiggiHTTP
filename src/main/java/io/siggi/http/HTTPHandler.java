@@ -19,6 +19,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -143,6 +144,35 @@ final class HTTPHandler {
 		}
 	}
 	String postData = null;
+
+	/**
+	 * Read an application/x-www-form-urlencoded request body.
+	 *
+	 * @param in the request body stream
+	 * @param contentLength the declared Content-Length, or -1 if the body is chunked
+	 * @param postLimit the maximum body size in bytes, or 0 or less for no limit
+	 * @return the body
+	 * @throws TooBigException if the body is larger than postLimit
+	 * @throws EOFException if the stream ends before contentLength bytes were read
+	 */
+	static byte[] readFormBody(InputStream in, long contentLength, int postLimit) throws IOException {
+		if (postLimit > 0 && contentLength > postLimit) {
+			throw new TooBigException();
+		}
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		byte[] buffer = new byte[4096];
+		int amountRead;
+		while ((amountRead = in.read(buffer, 0, buffer.length)) != -1) {
+			baos.write(buffer, 0, amountRead);
+			if (postLimit > 0 && baos.size() > postLimit) {
+				throw new TooBigException();
+			}
+		}
+		if (contentLength >= 0 && baos.size() < contentLength) {
+			throw new EOFException("Request body ended after " + baos.size() + " of " + contentLength + " bytes");
+		}
+		return baos.toByteArray();
+	}
 
 	private void badRequest() throws IOException {
 		resetHeaders();
@@ -744,20 +774,14 @@ final class HTTPHandler {
 					}
 				} else if (incomingContentType.toLowerCase().contains("application/x-www-form-urlencoded")) {
 					try {
-						if (postLimit > 0 && incomingContentLength > postLimit) {
-							tooBig();
-							return;
-						}
-						int icl = (int) incomingContentLength;
-						byte buffer[] = new byte[icl];
-						int writePtr = 0;
-						int amountRead;
-						for (int i = icl; i > 0; i -= amountRead) {
-							amountRead = contentStream.read(buffer, writePtr, icl - writePtr);
-							writePtr += amountRead;
-						}
-						postData = new String(buffer);
+						postData = new String(readFormBody(contentStream, incomingContentLength, postLimit));
 						Util.parseQueryString(postData, post);
+					} catch (TooBigException ex) {
+						tooBig();
+						return;
+					} catch (EOFException ex) {
+						badRequest();
+						return;
 					} finally {
 						if (keepAlive) {
 							contentStream.setEofSequence(null);
