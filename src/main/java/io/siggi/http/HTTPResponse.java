@@ -256,6 +256,7 @@ public class HTTPResponse extends OutputStream {
 				setHeader("Allow", "OPTIONS, GET, HEAD, PUT, DELETE");
 				sendHeaders();
 			}
+			break;
 			case "PUT": {
 				File parentFile = f.getParentFile();
 				if (!parentFile.exists()) {
