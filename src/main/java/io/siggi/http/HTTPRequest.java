@@ -404,6 +404,9 @@ public class HTTPRequest {
 
 	/**
 	 * Get the request body stream. This may be null if the request body was already parsed.
+	 * <p>
+	 * The server manages this stream, so callers don't need to close it. This method is deliberately named with a
+	 * {@code get} prefix so IDEs such as IntelliJ treat it as a getter and don't warn about an unclosed resource.
 	 */
 	public InputStream getInputStream() {
 		return inStream;
