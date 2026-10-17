@@ -77,7 +77,7 @@ public final class ChunkedInputStream extends InputStream {
 				}
 			}
 			if ((++sizeOfSize) > 16) throw new IOException("Malformed chunk size encoding");
-			if (c < 0 || c > decodeCharset.length) throw new IOException("Malformed chunk size encoding");
+			if (c < 0 || c >= decodeCharset.length) throw new IOException("Malformed chunk size encoding");
 			int value = decodeCharset[c];
 			if (value == -1) throw new IOException("Malformed chunk size encoding");
 			size <<= 4;
