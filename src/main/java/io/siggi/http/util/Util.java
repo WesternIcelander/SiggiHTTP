@@ -423,12 +423,16 @@ public class Util {
 					}
 					key.append(c);
 				} else {
-					if (c == '%') {
+					int high, low;
+					if (c == '%' && i + 2 < header.length()
+							&& (high = Character.digit(header.charAt(i + 1), 16)) != -1
+							&& (low = Character.digit(header.charAt(i + 2), 16)) != -1) {
+						valWriter.flush();
+						val.write((high << 4) | low);
 						i += 2;
-						if (i >= header.length()) break;
-						valWriter.write(Integer.parseInt(header.substring(i - 1, i + 1), 16));
 						continue;
 					}
+					// An invalid escape is kept as a literal %
 					if (c == '"') {
 						inQuotes = !inQuotes;
 						if (!usedQuotes) {
