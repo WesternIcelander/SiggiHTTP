@@ -203,11 +203,10 @@ public class HTTPRequest {
 			}
 			Sessions sessions = handler.server.getSessions();
 			String sessionId = cookies.get(sessionCookieName);
-			if (sessionId == null) {
+			session = sessionId == null ? null : sessions.get(sessionId);
+			if (session == null) {
 				session = sessions.newSession();
 				sessionId = session.getSessionId();
-			} else {
-				session = sessions.get(sessionId);
 			}
 			response.addHeader("Set-Cookie", sessionCookieName + "=" + sessionId + "; path=/; HttpOnly;" + (isSecure() ? " Secure;" : ""));
 		}
