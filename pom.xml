@@ -31,6 +31,46 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.2.5</version>
 			</plugin>
+			<plugin>
+				<!--
+					The real build uses -source 8 rather than release 8 so that
+					@Deprecated(since=..., forRemoval=...) compiles and shows up in IDEs.
+					That doesn't catch calls to Java 9+ APIs, which would only fail at
+					runtime on Java 8. So also compile a copy with those annotation
+					arguments stripped against the Java 8 API with release 8.
+				-->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>java-8-api-check</id>
+						<phase>process-classes</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<property name="release8.dir" value="${project.build.directory}/java-8-api-check"/>
+								<delete dir="${release8.dir}"/>
+								<copy todir="${release8.dir}/src" encoding="UTF-8" outputencoding="UTF-8">
+									<fileset dir="${project.build.sourceDirectory}" includes="**/*.java"/>
+								</copy>
+								<replaceregexp flags="g" encoding="UTF-8"
+									match="@Deprecated\s*\([^)]*\)" replace="@Deprecated">
+									<fileset dir="${release8.dir}/src" includes="**/*.java"/>
+								</replaceregexp>
+								<mkdir dir="${release8.dir}/classes"/>
+								<javac srcdir="${release8.dir}/src" destdir="${release8.dir}/classes"
+									release="8" encoding="UTF-8" includeantruntime="false"
+									classpathref="maven.compile.classpath" nowarn="true" failonerror="true">
+									<compilerarg value="-Xlint:-options"/>
+								</javac>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 </project>
