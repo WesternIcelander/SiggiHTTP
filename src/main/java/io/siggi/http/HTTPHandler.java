@@ -16,15 +16,12 @@ import io.siggi.http.util.CloudFlare;
 import io.siggi.http.util.HTMLUtils;
 import io.siggi.http.util.Util;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
@@ -34,6 +31,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -44,6 +42,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.Executor;
@@ -463,25 +462,22 @@ final class HTTPHandler {
 	}
 
 	private static String deURLEncode(String encoded) {
-		byte abyte0[] = encoded.getBytes();
-		int i = 0;
-		byte abyte1[] = new byte[encoded.length()];
-		for (int j = 0; j < abyte0.length; j++) {
-			if (abyte0[j] == 37) {
-				byte abyte3[] = {
-					abyte0[j + 1], abyte0[j + 2]
-				};
-				byte byte0 = (byte) Integer.parseInt(new String(abyte3), 16);
-				j += 2;
-				abyte1[i++] = byte0;
+		byte[] in = encoded.getBytes(StandardCharsets.UTF_8);
+		byte[] out = new byte[in.length];
+		int length = 0;
+		for (int i = 0; i < in.length; i++) {
+			int high, low;
+			if (in[i] == '%' && i + 2 < in.length
+					&& (high = Character.digit(in[i + 1], 16)) != -1
+					&& (low = Character.digit(in[i + 2], 16)) != -1) {
+				out[length++] = (byte) ((high << 4) | low);
+				i += 2;
 			} else {
-				abyte1[i++] = abyte0[j];
+				// An invalid escape is kept as a literal %
+				out[length++] = in[i];
 			}
 		}
-
-		byte abyte2[] = new byte[i];
-		System.arraycopy(abyte1, 0, abyte2, 0, i);
-		return new String(abyte2);
+		return new String(out, 0, length, StandardCharsets.UTF_8);
 	}
 
 	void keepAlive(boolean keepAlive) {
@@ -525,6 +521,8 @@ final class HTTPHandler {
 				requestURI = requestURI.substring(0, requestURI.indexOf("?"));
 				Util.parseQueryString(getRaw, get);
 			}
+			// An encoded slash can't be told apart from a real one after decoding
+			boolean hasEncodedSlash = requestURI.toLowerCase(Locale.ROOT).contains("%2f");
 			requestURI = deURLEncode(requestURI);
 			long incomingContentLength = -1L;
 			String incomingContentType = "application/x-octet-stream";
@@ -581,11 +579,11 @@ final class HTTPHandler {
 								while (cval.contains("+")) {
 									cval = cval.substring(0, cval.indexOf("+")) + "%20" + cval.substring(cval.indexOf("+") + 1);
 								}
-								ckey = fixString(deURLEncode(ckey));
-								cval = fixString(deURLEncode(cval));
+								ckey = deURLEncode(ckey);
+								cval = deURLEncode(cval);
 								cookies.put(ckey, cval);
 							} else {
-								cookies.put(fixString(deURLEncode(cookiePart)), "");
+								cookies.put(deURLEncode(cookiePart), "");
 							}
 						}
 					} else if (key.equalsIgnoreCase("Content-Length")) {
@@ -620,7 +618,7 @@ final class HTTPHandler {
 				badRequest();
 				return;
 			}
-			if (!requestURI.startsWith("/") && !requestURI.equals("*")) {
+			if (hasEncodedSlash || (!requestURI.startsWith("/") && !requestURI.equals("*"))) {
 				badRequest();
 				return;
 			}
@@ -1011,19 +1009,6 @@ final class HTTPHandler {
 		} catch (ParseException ex) {
 			return -1L;
 		}
-	}
-
-	private static String fixString(String s) {
-		try {
-			BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(s.getBytes()), "UTF-8"));
-			s = "";
-			String s2;
-			while ((s2 = reader.readLine()) != null) {
-				s += (s.equals("") ? "" : "\n") + s2;
-			}
-		} catch (Exception e) {
-		}
-		return s;
 	}
 
 	private static byte[] getBytes(String str) {
