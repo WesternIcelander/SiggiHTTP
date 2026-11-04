@@ -293,7 +293,7 @@ public class Util {
 		byte[] buffer = new byte[4096];
 		while ((c = in.read(buffer, 0, buffer.length)) != -1) {
 			baos.write(buffer, 0, c);
-			if (baos.size() > maxLength) {
+			if (maxLength >= 0 && baos.size() > maxLength) {
 				throw new TooBigException();
 			}
 		}

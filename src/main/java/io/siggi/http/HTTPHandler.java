@@ -756,13 +756,13 @@ final class HTTPHandler {
 								if (fileName == null) {
 									String val;
 									if (postLimit > 0) {
-										val = Util.readFullyAsString(partReader, postLimit - currentPostSize - fieldName.length() - 2);
+										val = Util.readFullyAsString(partReader, Math.max(0, postLimit - currentPostSize - fieldName.length() - 2));
 									} else {
 										val = Util.readFullyAsString(partReader);
 									}
 									post.put(fieldName, val);
 									currentPostSize += fieldName.length() + val.length() + 2;
-									if (currentPostSize > postLimit) {
+									if (postLimit > 0 && currentPostSize > postLimit) {
 										throw new TooBigException();
 									}
 								} else {
