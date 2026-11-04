@@ -461,6 +461,43 @@ final class HTTPHandler {
 		cleanupTasks.clear();
 	}
 
+	/**
+	 * Returns the value of the parameter called {@code name} in a
+	 * Content-Disposition header, with surrounding quotes removed, or null if
+	 * it isn't there. Parameter names must match exactly (ignoring case), so
+	 * looking up {@code name} doesn't find {@code filename}, and a {@code ;}
+	 * inside a quoted value doesn't end it.
+	 */
+	static String dispositionParam(String header, String name) {
+		int length = header.length();
+		int i = header.indexOf(';');
+		if (i == -1) return null;
+		while (i < length) {
+			i++; // skip the ;
+			int keyStart = i;
+			while (i < length && header.charAt(i) != '=' && header.charAt(i) != ';') i++;
+			String key = header.substring(keyStart, i).trim();
+			if (i >= length || header.charAt(i) == ';') continue; // no value
+			i++; // skip the =
+			while (i < length && header.charAt(i) == ' ') i++;
+			String value;
+			if (i < length && header.charAt(i) == '"') {
+				int end = header.indexOf('"', i + 1);
+				if (end == -1) end = length;
+				value = header.substring(i + 1, end);
+				i = header.indexOf(';', end);
+				if (i == -1) i = length;
+			} else {
+				int end = header.indexOf(';', i);
+				if (end == -1) end = length;
+				value = header.substring(i, end).trim();
+				i = end;
+			}
+			if (key.equalsIgnoreCase(name)) return value;
+		}
+		return null;
+	}
+
 	private static String deURLEncode(String encoded) {
 		byte[] in = encoded.getBytes(StandardCharsets.UTF_8);
 		byte[] out = new byte[in.length];
@@ -697,30 +734,13 @@ final class HTTPHandler {
 									String key = entry.getKey();
 									for (String val : entry.getValue()) {
 										if (key.equalsIgnoreCase("Content-Disposition")) {
-											int fieldNamePos = val.indexOf("name=") + 5;
-											int fieldNamePosAfterBoundary = val.indexOf(";", fieldNamePos);
-											if (fieldNamePos != 4) { // -1 + 5 = 4, added +5 to fieldNamePos above
-												if (fieldNamePosAfterBoundary == -1) {
-													fieldName = val.substring(fieldNamePos);
-												} else {
-													fieldName = val.substring(fieldNamePos, fieldNamePosAfterBoundary);
-												}
-												if (fieldName.startsWith("\"") && fieldName.endsWith("\"")) {
-													fieldName = fieldName.substring(1, fieldName.length() - 1);
-												}
+											String name = dispositionParam(val, "name");
+											if (name != null) {
+												fieldName = name;
 											}
-											int fileNamePos = val.indexOf("filename=") + 9;
-											int fileNamePosAfterBoundary = val.indexOf(";", fileNamePos);
-											if (fileNamePos != 8) { // -1 + 9 = 8, added +9 to fileNamePos above
-												if (fileNamePosAfterBoundary == -1) {
-													fileName = val.substring(fileNamePos);
-												} else {
-													fileName = val.substring(fileNamePos, fileNamePosAfterBoundary);
-												}
-												if (fileName.startsWith("\"") && fileName.endsWith("\"")) {
-													fileName = fileName.substring(1, fileName.length() - 1);
-												}
-												fileName = Util.urldecode(fileName, false);
+											String file = dispositionParam(val, "filename");
+											if (file != null) {
+												fileName = Util.urldecode(file, false);
 											}
 										} else if (key.equalsIgnoreCase("Content-Length")) {
 											contentLength = Integer.parseInt(val);
