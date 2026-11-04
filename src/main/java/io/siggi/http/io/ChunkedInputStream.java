@@ -1,5 +1,6 @@
 package io.siggi.http.io;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -121,8 +122,7 @@ public final class ChunkedInputStream extends InputStream {
 		int actualLength = Math.min(length, maxRead);
 		int readAmount = in.read(buffer, offset, actualLength);
 		if (readAmount == -1) {
-			endOfStream = true;
-			return readAmount;
+			throw new EOFException("Connection closed in the middle of a chunk");
 		}
 		remainingInChunk -= readAmount;
 		if (remainingInChunk == 0L) {
