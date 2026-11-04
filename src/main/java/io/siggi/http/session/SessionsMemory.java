@@ -44,6 +44,7 @@ final class SessionsMemory extends Sessions {
 			} while (sessionExists(sessionId));
 			Session session = new Session(this, sessionId);
 			sessions.put(sessionId, session);
+			session.lastUse = System.currentTimeMillis();
 			return session;
 		} finally {
 			writeLock.unlock();
