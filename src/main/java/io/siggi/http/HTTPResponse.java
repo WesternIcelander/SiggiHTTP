@@ -538,6 +538,8 @@ public class HTTPResponse extends OutputStream {
 	/**
 	 * Sets the response header. (200 OK, 404 Not Found, etc) Do NOT include
 	 * HTTP/1.1 in front.
+	 *
+	 * @throws IllegalArgumentException if it contains CR or LF
 	 */
 	public void setHeader(String responseHeader) {
 		throwIllegalIfClosed();
@@ -557,34 +559,38 @@ public class HTTPResponse extends OutputStream {
 	 * Adds a header to the result headers. Unlike
 	 * <code>setHeader(String,String)</code>, this only adds a header with the
 	 * same key, rather than removing all others with the same key.
+	 *
+	 * @throws IllegalArgumentException if the key or value contains CR or LF
 	 */
 	public void addHeader(String key, String value) {
 		throwIllegalIfClosed();
 		if (request.handler.wrote) {
 			throw new IllegalStateException("Headers already sent, and cannot be modified!");
 		}
+		request.handler.addHeader(key, value);
 		if (key.equalsIgnoreCase("Content-Length")) {
 			chunked = false;
 			request.handler.chunked = false;
 		}
-		request.handler.addHeader(key, value);
 	}
 
 	/**
 	 * When using Set-Cookie, adds one cookie header. With all other headers,
 	 * replaces all headers with the key <code>key</code> and with the new
 	 * header.
+	 *
+	 * @throws IllegalArgumentException if the key or value contains CR or LF
 	 */
 	public void setHeader(String key, String value) {
 		throwIllegalIfClosed();
 		if (request.handler.wrote) {
 			throw new IllegalStateException("Headers already sent, and cannot be modified!");
 		}
+		request.handler.setHeader(key, value);
 		if (key.equalsIgnoreCase("Content-Length")) {
 			chunked = false;
 			request.handler.chunked = false;
 		}
-		request.handler.setHeader(key, value);
 	}
 
 	/**

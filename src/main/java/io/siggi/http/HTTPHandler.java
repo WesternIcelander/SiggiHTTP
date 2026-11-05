@@ -893,6 +893,7 @@ final class HTTPHandler {
 	}
 
 	void setHeader(String response) {
+		rejectLineBreaks(response);
 		if (!response.contains(" ")) {
 			throw new IllegalArgumentException("Response must be a number followed by the name of that response type.");
 		}
@@ -905,6 +906,8 @@ final class HTTPHandler {
 	}
 
 	void setHeader(String key, String val) {
+		rejectLineBreaks(key);
+		rejectLineBreaks(val);
 		if (key.equalsIgnoreCase("Set-Cookie")) {
 			addHeader(key, val);
 			return;
@@ -920,6 +923,8 @@ final class HTTPHandler {
 	}
 
 	void addHeader(String key, String val) {
+		rejectLineBreaks(key);
+		rejectLineBreaks(val);
 		if (key.equalsIgnoreCase("Content-Length")) {
 			chunked = false;
 			deleteHeader("Transfer-Encoding");
@@ -931,6 +936,16 @@ final class HTTPHandler {
 			headers.put(key, list);
 		}
 		list.add(val);
+	}
+
+	/**
+	 * Rejects CR and LF in the status line and in header names and values, so
+	 * request data placed in a header can't start a new header line.
+	 */
+	private static void rejectLineBreaks(String str) {
+		if (str.indexOf('\r') >= 0 || str.indexOf('\n') >= 0) {
+			throw new IllegalArgumentException("Headers must not contain CR or LF characters.");
+		}
 	}
 
 	void deleteHeader(String key) {
