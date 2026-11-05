@@ -3,11 +3,14 @@ package io.siggi.http.simpleresponders;
 import io.siggi.http.HTTPRequest;
 import io.siggi.http.HTTPResponder;
 import io.siggi.http.defaultresponders.DefaultResponder;
+import io.siggi.http.util.Util;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStreamWriter;
 import java.util.Arrays;
+
+import static io.siggi.http.util.HTMLUtils.htmlentities;
 
 public class VirtualFileSystemResponder implements HTTPResponder {
 
@@ -97,11 +100,11 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 						// Generate a directory listing...
 						ByteArrayOutputStream out = new ByteArrayOutputStream();
 						OutputStreamWriter writer = new OutputStreamWriter(out, "UTF-8");
-						writer.write("<!DOCTYPE html>\n<html>\n<head>\n<title>Index of " + request.url + "</title>\n");
+						writer.write("<!DOCTYPE html>\n<html>\n<head>\n<title>Index of " + htmlentities(request.url) + "</title>\n");
 						writer.write(DefaultResponder.STYLE);
 						writer.write("</head>\n");
 						writer.write("<body>\n");
-						writer.write("<h1>Index of " + request.url + "</h1><br>\n");
+						writer.write("<h1>Index of " + htmlentities(request.url) + "</h1><br>\n");
 						if (new File(file, ".htaccess").exists()) {
 							writer.write("<b>WARNING:</b> This HTTP server does not support Apache .htaccess files.  To remove this message, delete the .htaccess file from this directory.<br>\n");
 						}
@@ -125,8 +128,10 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 							if (fileName.startsWith(".") || fileName.contains(".httpupload.")) {
 								continue;
 							}
+							String href = htmlentities(Util.urlencode(fileName, "%20"));
+							String displayName = htmlentities(fileName);
 							if (fileToList.isDirectory()) {
-								writer.write("<tr>\n<td><a href=\"" + fileName + "/\">" + fileName + "</a></td><td>--</td>\n</tr>\n");
+								writer.write("<tr>\n<td><a href=\"" + href + "/\">" + displayName + "</a></td><td>--</td>\n</tr>\n");
 							} else if (fileToList.isFile()) {
 								long fileSize = fileToList.length();
 								String sizeString = fileSize + " bytes";
@@ -146,13 +151,13 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 									sizeString = theSize + " kB";
 								}
 
-								writer.write("<tr>\n<td><a href=\"" + fileName + "\">" + fileName + "</a></td><td>" + sizeString + "</td>\n");
+								writer.write("<tr>\n<td><a href=\"" + href + "\">" + displayName + "</a></td><td>" + sizeString + "</td>\n");
 							}
 						}
 						writer.write("</table>\n<br>\n");
 						writer.write("<br>\n<hr>\n" + request.getServerSignature() + "<br>\n</body>\n</html>\n");
 						writer.flush();
-						byte[] pageBytes = prepareHtml(new String(out.toByteArray()), request).getBytes();
+						byte[] pageBytes = prepareHtml(new String(out.toByteArray(), "UTF-8"), request).getBytes("UTF-8");
 						request.response.setHeader("200 OK");
 						request.response.contentLength((long) pageBytes.length);
 						request.response.write(pageBytes);
