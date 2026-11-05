@@ -173,6 +173,75 @@ final class HTTPHandler {
 		return baos.toByteArray();
 	}
 
+	/**
+	 * Returned by {@link #getRequestBodyLength(Map)} when the request body is chunked.
+	 */
+	static final long CHUNKED_BODY = -2L;
+
+	/**
+	 * Work out how a request body is framed, following RFC 9112 section 6. Anything ambiguous is rejected rather than
+	 * guessed at, because a proxy in front of the server might guess differently and let a second request be smuggled
+	 * inside the body of the first.
+	 *
+	 * @param headers the request headers, with case-insensitive keys
+	 * @return the length of the body, -1 if there is no body, or {@link #CHUNKED_BODY} if the body is chunked
+	 * @throws IllegalArgumentException if the request has both Transfer-Encoding and Content-Length, uses a transfer
+	 * coding other than a single chunked, or has a Content-Length that is invalid or has conflicting values
+	 */
+	static long getRequestBodyLength(Map<String, List<String>> headers) {
+		List<String> transferEncodings = headers.get("Transfer-Encoding");
+		List<String> contentLengths = headers.get("Content-Length");
+		if (transferEncodings != null && !transferEncodings.isEmpty()) {
+			if (contentLengths != null && !contentLengths.isEmpty()) {
+				throw new IllegalArgumentException("Both Transfer-Encoding and Content-Length are present");
+			}
+			List<String> codings = new ArrayList<>();
+			for (String value : transferEncodings) {
+				for (String coding : value.split(",")) {
+					coding = coding.trim();
+					if (!coding.isEmpty()) {
+						codings.add(coding);
+					}
+				}
+			}
+			// No other transfer codings are supported, and chunked can only be applied once
+			if (codings.size() != 1 || !codings.get(0).equalsIgnoreCase("chunked")) {
+				throw new IllegalArgumentException("Unsupported Transfer-Encoding: " + codings);
+			}
+			return CHUNKED_BODY;
+		}
+		if (contentLengths == null || contentLengths.isEmpty()) {
+			return -1L;
+		}
+		long length = -1L;
+		for (String value : contentLengths) {
+			// A repeated Content-Length is allowed if every copy has the same value
+			for (String item : value.split(",", -1)) {
+				item = item.trim();
+				if (item.isEmpty()) {
+					throw new IllegalArgumentException("Empty Content-Length");
+				}
+				for (int i = 0; i < item.length(); i++) {
+					char c = item.charAt(i);
+					if (c < '0' || c > '9') {
+						throw new IllegalArgumentException("Invalid Content-Length: " + item);
+					}
+				}
+				long itemLength;
+				try {
+					itemLength = Long.parseLong(item);
+				} catch (NumberFormatException e) {
+					throw new IllegalArgumentException("Content-Length is too big: " + item);
+				}
+				if (length != -1L && length != itemLength) {
+					throw new IllegalArgumentException("Conflicting Content-Length values");
+				}
+				length = itemLength;
+			}
+		}
+		return length;
+	}
+
 	private void badRequest() throws IOException {
 		resetHeaders();
 		String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>400 Bad Request</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>400 Bad Request</h1><br>\nThe server could not understand your request.<br>\n<br>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
@@ -632,13 +701,6 @@ final class HTTPHandler {
 								cookies.put(deURLEncode(cookiePart), "");
 							}
 						}
-					} else if (key.equalsIgnoreCase("Content-Length")) {
-						try {
-							incomingContentLength = Long.parseLong(val);
-						} catch (Exception e) {
-							badRequest();
-							return;
-						}
 					} else if (key.equalsIgnoreCase("Content-Type")) {
 						incomingContentType = val;
 					} else if (key.equalsIgnoreCase("Referer")) {
@@ -658,6 +720,21 @@ final class HTTPHandler {
 			}
 			if (forceHost != null) {
 				host = forceHost;
+			}
+			try {
+				incomingContentLength = getRequestBodyLength(headers);
+			} catch (IllegalArgumentException e) {
+				badRequest();
+				return;
+			}
+			boolean incomingIsChunked = incomingContentLength == CHUNKED_BODY;
+			if (incomingIsChunked) {
+				incomingContentLength = -1L;
+				if (!httpVersion.equals("HTTP/1.1")) {
+					// HTTP/1.0 has no Transfer-Encoding, so an intermediary may have framed this differently
+					// (RFC 9112 section 6.1)
+					cannotKeepAlive = true;
+				}
 			}
 			if (host == null && !httpVersion.equals("HTTP/1.0") && !httpVersion.equals("HTTP/0.9")) {
 				// Host is mandatory from HTTP/1.1 onwards (RFC 9112 section 3.2)
@@ -685,16 +762,6 @@ final class HTTPHandler {
 				}
 			}
 			postData = null;
-			boolean incomingIsChunked = false;
-			{
-				List<String> encodingL = headers.get("Transfer-Encoding");
-				if (encodingL != null && !encodingL.isEmpty()) {
-					String encoding = encodingL.get(0);
-					if (encoding != null && encoding.equals("chunked")) {
-						incomingIsChunked = true;
-					}
-				}
-			}
 			boolean hasStream = incomingContentLength >= 0 || incomingIsChunked;
 			if (hasStream) {
 				InputStream stream;
