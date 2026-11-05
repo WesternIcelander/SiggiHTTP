@@ -175,10 +175,7 @@ final class HTTPHandler {
 
 	private void badRequest() throws IOException {
 		resetHeaders();
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		new RuntimeException().printStackTrace(new PrintStream(baos, true));
-		String req = new String(baos.toByteArray());
-		String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>400 Bad Request</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>400 Bad Request</h1><br>\n<br>\n<pre style=\"font-family: Monaco; font-size: 10px\">" + req + "</pre><br>\n<br>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
+		String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>400 Bad Request</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>400 Bad Request</h1><br>\nThe server could not understand your request.<br>\n<br>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
 		byte pageBytes[] = getBytes(page);
 		setHeader("400 Bad Request");
 		setHeader("Content-Length", Integer.toString(pageBytes.length));
@@ -383,14 +380,19 @@ final class HTTPHandler {
 					}
 					keepAlive = false;
 				} catch (Exception e) {
-					/*System.err.print("Server error (500 sent to client): ");
-					 e.printStackTrace();*/
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 					e.printStackTrace(new PrintStream(baos, true));
 					String stackTrace = new String(baos.toByteArray());
+					System.err.print("SiggiHTTP: error while handling a request: " + stackTrace);
 					if (!wrote) {
 						try {
-							String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>500 Internal Server Error</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>500 Internal Server Error</h1><br>\n*puke* ugh, I feel sick.<p>An error has occurred. The details of this problem are shown below.<br>\n<hr>\n<pre style=\"font-family: Monaco; font-size: 10px\">" + stackTrace + "</pre>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
+							String details;
+							if (server.isDevMode()) {
+								details = "An error has occurred. The details of this problem are shown below.<br>\n<hr>\n<pre style=\"font-family: Monaco; font-size: 10px\">" + HTMLUtils.htmlentities(stackTrace, false) + "</pre>\n";
+							} else {
+								details = "An error has occurred. The details have been logged on the server.<br>\n";
+							}
+							String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>500 Internal Server Error</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>500 Internal Server Error</h1><br>\n*puke* ugh, I feel sick.<p>" + details + "<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
 							byte pageBytes[] = getBytes(page);
 							setHeader("500 Internal Server Error");
 							setHeader("Content-Length", Integer.toString(pageBytes.length));

@@ -617,6 +617,28 @@ public final class HTTPServer {
 		this.ignoringMultipartFormData = ignore;
 	}
 
+	private boolean devMode = false;
+
+	/**
+	 * Returns whether HTTPServer is in dev mode. See the docs of {@link HTTPServer#setDevMode(boolean)}.
+	 *
+	 * @return true if HTTPServer is in dev mode.
+	 */
+	public boolean isDevMode() {
+		return devMode;
+	}
+
+	/**
+	 * Set whether HTTPServer is in dev mode, false by default. In dev mode, the 500 Internal Server Error page
+	 * includes the stack trace of the exception that caused it. Stack traces are always logged to
+	 * {@link System#err}. Don't enable this on a public server, as stack traces can reveal details about the server.
+	 *
+	 * @param devMode whether to enable dev mode.
+	 */
+	public void setDevMode(boolean devMode) {
+		this.devMode = devMode;
+	}
+
 	public File getTmpDir() {
 		return tmpDir;
 	}
