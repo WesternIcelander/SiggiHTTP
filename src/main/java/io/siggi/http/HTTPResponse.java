@@ -258,6 +258,12 @@ public class HTTPResponse extends OutputStream {
 			}
 			break;
 			case "PUT": {
+				if (request.inStream == null) {
+					setHeader("411 Length Required");
+					setContentType("text/plain");
+					send("A PUT request needs a Content-Length or a chunked body.");
+					return;
+				}
 				File parentFile = f.getParentFile();
 				if (!parentFile.exists()) {
 					parentFile.mkdirs();

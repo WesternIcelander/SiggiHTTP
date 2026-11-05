@@ -665,6 +665,7 @@ final class HTTPHandler {
 				if (expect.equalsIgnoreCase("100-continue")) {
 					if ((uploadLimit > 0 && incomingContentLength > uploadLimit)
 							|| (postLimit > 0
+							&& method.equals("POST")
 							&& incomingContentType != null
 							&& incomingContentType.equalsIgnoreCase("application/x-www-form-urlencoded")
 							&& incomingContentLength > postLimit)) {
@@ -790,7 +791,8 @@ final class HTTPHandler {
 						// we consumed it
 						contentStream = null;
 					}
-				} else if (incomingContentType.toLowerCase().contains("application/x-www-form-urlencoded")) {
+				} else if (method.equals("POST") && incomingContentType.toLowerCase().contains("application/x-www-form-urlencoded")) {
+					// only POST bodies are forms; a PUT with this Content-Type (curl --data-binary's default) is raw data
 					try {
 						postData = new String(readFormBody(contentStream, incomingContentLength, postLimit));
 						Util.parseQueryString(postData, post);
