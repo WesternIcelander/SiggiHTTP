@@ -7,7 +7,10 @@ import io.siggi.http.util.Util;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 import static io.siggi.http.util.HTMLUtils.htmlentities;
@@ -26,6 +29,7 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 	public final String realPath;
 
 	private boolean allowWriteAccess = false;
+	private boolean allowSymlinksOutsideRoot = false;
 	private HTTPResponder filter = null;
 
 	/**
@@ -59,8 +63,9 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 		}
 		if (request.url.toLowerCase().startsWith(mountPath + "/") || request.url.toLowerCase().equals(mountPath)) {
 			String access = request.url.substring(mountPath.length());
-			File file = new File(realPath + access);
-			if (access.contains("/../") || access.endsWith("/..")) {
+			File root = new File(realPath.isEmpty() ? "/" : realPath);
+			File file = resolveInsideRoot(root, access);
+			if (file == null) {
 				String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>400 Bad Request</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>400 Bad Request</h1><br>\nQuit tryna hack me!<br>\n<br>\n<hr>\n" + request.getServerSignature() + "<br>\n</body>\n</html>";
 				byte pageBytes[] = request.response.getBytes(page);
 				request.response.setHeader("400 Bad Request");
@@ -79,6 +84,10 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 					file = indexFile2;
 					access += "index.htm";
 				}
+			}
+			if (!allowSymlinksOutsideRoot && !isRealPathInsideRoot(root, file)) {
+				// Not an attack, just a symlink that leads elsewhere, so treat it as missing
+				return;
 			}
 			if (file.isDirectory()) {
 				if (!access.endsWith("/")) {
@@ -186,12 +195,50 @@ public class VirtualFileSystemResponder implements HTTPResponder {
 		}
 	}
 
+	/**
+	 * Resolves the requested path against the root without following symlinks.
+	 * Returns null if the path leaves the root, for example through ".." or,
+	 * on Windows, "..\".
+	 */
+	private static File resolveInsideRoot(File root, String access) {
+		while (access.startsWith("/")) {
+			access = access.substring(1);
+		}
+		try {
+			Path rootPath = root.toPath().toAbsolutePath().normalize();
+			Path path = rootPath.resolve(access).normalize();
+			return path.startsWith(rootPath) ? path.toFile() : null;
+		} catch (InvalidPathException e) {
+			return null;
+		}
+	}
+
+	private static boolean isRealPathInsideRoot(File root, File file) {
+		try {
+			return file.getCanonicalFile().toPath().startsWith(root.getCanonicalFile().toPath());
+		} catch (IOException e) {
+			return false;
+		}
+	}
+
 	protected String prepareHtml(String html, HTTPRequest request) {
 		return html;
 	}
 
 	public VirtualFileSystemResponder setAllowWriteAccess(boolean allowWriteAccess) {
 		this.allowWriteAccess = allowWriteAccess;
+		return this;
+	}
+
+	/**
+	 * Sets whether symbolic links may lead to files and directories outside
+	 * the real path. Off by default, so a symlink inside the real path that
+	 * points elsewhere is treated as if it doesn't exist.
+	 * @param allowSymlinksOutsideRoot true to follow symlinks anywhere
+	 * @return this responder
+	 */
+	public VirtualFileSystemResponder setAllowSymlinksOutsideRoot(boolean allowSymlinksOutsideRoot) {
+		this.allowSymlinksOutsideRoot = allowSymlinksOutsideRoot;
 		return this;
 	}
 
