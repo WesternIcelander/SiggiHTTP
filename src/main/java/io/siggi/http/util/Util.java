@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -510,5 +512,136 @@ public class Util {
 		} catch (NumberFormatException nfe) {
 			throw new IllegalArgumentException("Invalid hex");
 		}
+	}
+
+	/**
+	 * Parse a literal IPv4 or IPv6 address without doing a DNS lookup. An IPv6
+	 * address may be enclosed in square brackets.
+	 *
+	 * @param address the address to parse.
+	 * @return the address, or null if it is not a valid IP literal.
+	 */
+	public static InetAddress parseIPLiteral(String address) {
+		if (address == null) {
+			return null;
+		}
+		address = address.trim();
+		boolean bracketed = address.startsWith("[") && address.endsWith("]");
+		if (bracketed) {
+			address = address.substring(1, address.length() - 1);
+		}
+		byte[] bytes;
+		if (address.indexOf(':') >= 0) {
+			bytes = parseIPv6(address);
+		} else if (bracketed) {
+			return null;
+		} else {
+			bytes = parseIPv4(address);
+		}
+		if (bytes == null) {
+			return null;
+		}
+		try {
+			return InetAddress.getByAddress(bytes);
+		} catch (UnknownHostException e) {
+			return null;
+		}
+	}
+
+	private static byte[] parseIPv4(String address) {
+		String[] parts = address.split("\\.", -1);
+		if (parts.length != 4) {
+			return null;
+		}
+		byte[] bytes = new byte[4];
+		for (int i = 0; i < parts.length; i++) {
+			String part = parts[i];
+			if (part.isEmpty() || part.length() > 3) {
+				return null;
+			}
+			int value = 0;
+			for (int j = 0; j < part.length(); j++) {
+				char c = part.charAt(j);
+				if (c < '0' || c > '9') {
+					return null;
+				}
+				value = value * 10 + (c - '0');
+			}
+			if (value > 255) {
+				return null;
+			}
+			bytes[i] = (byte) value;
+		}
+		return bytes;
+	}
+
+	private static byte[] parseIPv6(String address) {
+		int doubleColon = address.indexOf("::");
+		if (doubleColon >= 0 && address.indexOf("::", doubleColon + 1) >= 0) {
+			return null;
+		}
+		List<Integer> head = new ArrayList<>();
+		List<Integer> tail = new ArrayList<>();
+		if (doubleColon >= 0) {
+			if (!parseIPv6Groups(address.substring(0, doubleColon), false, head)
+					|| !parseIPv6Groups(address.substring(doubleColon + 2), true, tail)
+					|| head.size() + tail.size() > 7) {
+				return null;
+			}
+		} else {
+			if (!parseIPv6Groups(address, true, head) || head.size() != 8) {
+				return null;
+			}
+		}
+		byte[] bytes = new byte[16];
+		for (int i = 0; i < head.size(); i++) {
+			bytes[i * 2] = (byte) (head.get(i) >> 8);
+			bytes[i * 2 + 1] = (byte) (int) head.get(i);
+		}
+		int offset = 8 - tail.size();
+		for (int i = 0; i < tail.size(); i++) {
+			bytes[(offset + i) * 2] = (byte) (tail.get(i) >> 8);
+			bytes[(offset + i) * 2 + 1] = (byte) (int) tail.get(i);
+		}
+		return bytes;
+	}
+
+	private static boolean parseIPv6Groups(String str, boolean allowIPv4End, List<Integer> groups) {
+		if (str.isEmpty()) {
+			return true;
+		}
+		String[] parts = str.split(":", -1);
+		for (int i = 0; i < parts.length; i++) {
+			String part = parts[i];
+			if (allowIPv4End && i == parts.length - 1 && part.indexOf('.') >= 0) {
+				byte[] ipv4 = parseIPv4(part);
+				if (ipv4 == null) {
+					return false;
+				}
+				groups.add(((ipv4[0] & 0xff) << 8) | (ipv4[1] & 0xff));
+				groups.add(((ipv4[2] & 0xff) << 8) | (ipv4[3] & 0xff));
+				continue;
+			}
+			if (part.isEmpty() || part.length() > 4) {
+				return false;
+			}
+			int value = 0;
+			for (int j = 0; j < part.length(); j++) {
+				char c = part.charAt(j);
+				int digit;
+				if (c >= '0' && c <= '9') {
+					digit = c - '0';
+				} else if (c >= 'a' && c <= 'f') {
+					digit = c - 'a' + 10;
+				} else if (c >= 'A' && c <= 'F') {
+					digit = c - 'A' + 10;
+				} else {
+					return false;
+				}
+				value = (value << 4) | digit;
+			}
+			groups.add(value);
+		}
+		return true;
 	}
 }

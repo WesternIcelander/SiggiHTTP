@@ -589,9 +589,13 @@ final class HTTPHandler {
 							}
 
 							for (int i = forwardedFor.length - 1; i >= 0; i--) {
-								inetAddress = InetAddress.getByName(forwardedFor[i]);
+								InetAddress forwardedAddress = Util.parseIPLiteral(forwardedFor[i]);
+								if (forwardedAddress == null) {
+									break;
+								}
+								inetAddress = forwardedAddress;
 								ip = inetAddress.getHostAddress();
-								if (CloudFlare.isCloudFlare(forwardedFor[i]) || server.isIPTrusted(forwardedFor[i])) {
+								if (CloudFlare.isCloudFlare(ip) || server.isIPTrusted(ip)) {
 									continue;
 								}
 								break;
@@ -599,8 +603,11 @@ final class HTTPHandler {
 						}
 					} else if (key.equalsIgnoreCase("CF-Connecting-IP")) { // CloudFlare gateway
 						if (CloudFlare.isCloudFlare(realInetAddress) || server.isIPTrusted(realInetAddress.getHostAddress())) {
-							inetAddress = InetAddress.getByName(val);
-							ip = inetAddress.getHostAddress();
+							InetAddress connectingAddress = Util.parseIPLiteral(val);
+							if (connectingAddress != null) {
+								inetAddress = connectingAddress;
+								ip = inetAddress.getHostAddress();
+							}
 						}
 					} else if (key.equalsIgnoreCase("X-Forwarded-Host")) { // Loopback gateway
 						if (realInetAddress.isLoopbackAddress() || server.isIPTrusted(realInetAddress.getHostAddress())) {
