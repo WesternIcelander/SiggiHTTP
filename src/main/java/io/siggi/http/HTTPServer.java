@@ -595,6 +595,31 @@ public final class HTTPServer {
 		this.requestURISizeLimit = requestURISizeLimit;
 	}
 
+	private long requestHeaderTimeout = 30000L;
+
+	/**
+	 * Get the time limit for receiving the request line and headers. Default is
+	 * 30 seconds.
+	 *
+	 * @return the time limit in milliseconds, or 0 or less for no limit
+	 */
+	public long getRequestHeaderTimeout() {
+		return requestHeaderTimeout;
+	}
+
+	/**
+	 * Set the time limit for receiving the request line and headers, counted
+	 * from the first byte of the request. A client that sends them slower than
+	 * this gets a 408 and is disconnected, so it can't hold a connection open
+	 * by trickling in a byte at a time. Default is 30 seconds.
+	 *
+	 * @param requestHeaderTimeout the time limit in milliseconds, or 0 or less
+	 * for no limit
+	 */
+	public void setRequestHeaderTimeout(long requestHeaderTimeout) {
+		this.requestHeaderTimeout = requestHeaderTimeout;
+	}
+
 	private boolean ignoringMultipartFormData = false;
 
 	/**

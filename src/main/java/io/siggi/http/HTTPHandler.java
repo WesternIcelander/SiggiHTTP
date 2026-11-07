@@ -6,6 +6,7 @@ import io.siggi.http.exception.TooBigException;
 import io.siggi.http.io.ChunkedInputStream;
 import io.siggi.http.io.ChunkedOutputStream;
 import io.siggi.http.io.ConcatenatedInputStream;
+import io.siggi.http.io.DeadlineInputStream;
 import io.siggi.http.io.EOFInputStream;
 import io.siggi.http.io.ReadLimitInputStream;
 import io.siggi.http.io.SubInputStream;
@@ -307,7 +308,7 @@ final class HTTPHandler {
 		this.server = server;
 		this.sock = socket;
 		this.sourceSocket = sourceSocket;
-		in = socket.getInputStream();
+		in = deadlineIn = new DeadlineInputStream(socket.getInputStream(), socket);
 		rawOut = socket.getOutputStream();
 		out = new ToggleableBufferedOutputStream(rawOut);
 		realInetAddress = inetAddress = socket.getInetAddress();
@@ -319,7 +320,8 @@ final class HTTPHandler {
 		this.server = server;
 		this.sock = socket;
 		this.sourceSocket = null;
-		in = preRead == null ? socket.getInputStream() : new ConcatenatedInputStream(preRead, socket.getInputStream());
+		deadlineIn = new DeadlineInputStream(socket.getInputStream(), socket);
+		in = preRead == null ? deadlineIn : new ConcatenatedInputStream(preRead, deadlineIn);
 		rawOut = socket.getOutputStream();
 		out = new ToggleableBufferedOutputStream(rawOut);
 		realInetAddress = inetAddress = socket.getInetAddress();
@@ -369,6 +371,11 @@ final class HTTPHandler {
 		boolean readAny = false;
 		try {
 			for (int i; (i = in.read()) != -1 && i != 10;) {
+				if (!readAny) {
+					// The whole request line and headers must arrive within this
+					// time of the first byte, however slowly they trickle in.
+					deadlineIn.startDeadline(server.getRequestHeaderTimeout());
+				}
 				readAny = true;
 				if (baos.size() >= maxLength) {
 					throw new TooBigException();
@@ -410,6 +417,7 @@ final class HTTPHandler {
 					responseBuffered = true;
 					keepAlive = false;
 					resetHeaders();
+					deadlineIn.clearDeadline();
 					String request = "";
 					send408 = true;
 					try {
@@ -439,13 +447,7 @@ final class HTTPHandler {
 				} catch (SocketTimeoutException | HTTPTimedOutException ste) {
 					// Timed out
 					if (send408) {
-						try {
-							setHeader("408 Request Timeout");
-							setHeader("Content-Length", "0");
-							setHeader("Connection", "close");
-							writeHeaders(false);
-						} catch (Exception ignored) {
-						}
+						requestTimeout();
 					}
 					keepAlive = false;
 				} catch (Exception e) {
@@ -489,6 +491,17 @@ final class HTTPHandler {
 				} catch (Exception e) {
 				}
 			}
+		}
+	}
+
+	private void requestTimeout() {
+		try {
+			setHeader("408 Request Timeout");
+			setHeader("Content-Length", "0");
+			setHeader("Connection", "close");
+			writeHeaders(false);
+			out.flush();
+		} catch (Exception ignored) {
 		}
 	}
 
@@ -645,6 +658,12 @@ final class HTTPHandler {
 			} catch (TooBigException e) {
 				tooBig();
 				return;
+			} catch (SocketTimeoutException e) {
+				requestTimeout();
+				keepAlive = false;
+				return;
+			} finally {
+				deadlineIn.clearDeadline();
 			}
 			String expect = null;
 			for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
@@ -1159,6 +1178,7 @@ final class HTTPHandler {
 	OutputStream contentOutStream = null;
 	private final Socket sock;
 	private final InputStream in;
+	private final DeadlineInputStream deadlineIn;
 	@Deprecated
 	final ServerSocket sourceSocket;
 	private final OutputStream rawOut;
