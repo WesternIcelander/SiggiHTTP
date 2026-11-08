@@ -11,6 +11,7 @@ import io.siggi.http.io.EOFInputStream;
 import io.siggi.http.io.ReadLimitInputStream;
 import io.siggi.http.io.SubInputStream;
 import io.siggi.http.io.ToggleableBufferedOutputStream;
+import io.siggi.http.io.WriteFailureTrackingOutputStream;
 import io.siggi.http.registry.HTTPResponderRegistry;
 import io.siggi.http.util.CaseInsensitiveHashMap;
 import io.siggi.http.util.CloudFlare;
@@ -309,7 +310,7 @@ final class HTTPHandler {
 		this.sock = socket;
 		this.sourceSocket = sourceSocket;
 		in = deadlineIn = new DeadlineInputStream(socket.getInputStream(), socket);
-		rawOut = socket.getOutputStream();
+		rawOut = clientOut = new WriteFailureTrackingOutputStream(socket.getOutputStream());
 		out = new ToggleableBufferedOutputStream(rawOut);
 		realInetAddress = inetAddress = socket.getInetAddress();
 		ip = inetAddress.getHostAddress();
@@ -322,7 +323,7 @@ final class HTTPHandler {
 		this.sourceSocket = null;
 		deadlineIn = new DeadlineInputStream(socket.getInputStream(), socket);
 		in = preRead == null ? deadlineIn : new ConcatenatedInputStream(preRead, deadlineIn);
-		rawOut = socket.getOutputStream();
+		rawOut = clientOut = new WriteFailureTrackingOutputStream(socket.getOutputStream());
 		out = new ToggleableBufferedOutputStream(rawOut);
 		realInetAddress = inetAddress = socket.getInetAddress();
 		ip = inetAddress.getHostAddress();
@@ -455,6 +456,13 @@ final class HTTPHandler {
 					}
 					keepAlive = false;
 				} catch (Exception e) {
+					if (clientOut.hasFailed()) {
+						// Writing to the client failed, so it has gone away, for example a viewer
+						// leaving a stream. That's not a server error, so end the connection quietly.
+						cannotKeepAlive = true;
+						keepAlive = false;
+						continue;
+					}
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 					e.printStackTrace(new PrintStream(baos, true));
 					String stackTrace = new String(baos.toByteArray());
@@ -1201,6 +1209,7 @@ final class HTTPHandler {
 	@Deprecated
 	final ServerSocket sourceSocket;
 	private final OutputStream rawOut;
+	private final WriteFailureTrackingOutputStream clientOut;
 	private final ToggleableBufferedOutputStream out;
 	private final InetAddress realInetAddress;
 	private InetAddress inetAddress;

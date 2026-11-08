@@ -29,6 +29,23 @@ class ConnectionTest {
 	void setUp() throws IOException {
 		HTTPServer server = new HTTPServerBuilder().build();
 		server.getResponderRegistry(null).register("/", request -> request.response.send("hello"));
+		server.getResponderRegistry(null).register("/stream", request -> {
+			// An endless chunked stream that stops when the client goes away
+			HTTPResponse response = request.response;
+			response.contentLength(-1);
+			response.setBuffered(false);
+			try {
+				while (true) {
+					response.write(new byte[1316]);
+					response.flush();
+					Thread.sleep(10L);
+				}
+			} catch (IOException | InterruptedException e) {
+			}
+		});
+		server.getResponderRegistry(null).register("/error", request -> {
+			throw new IOException("the application's own error");
+		});
 		serverSocket = new ServerSocket(0);
 		Thread acceptor = new Thread(() -> {
 			while (!serverSocket.isClosed()) {
@@ -128,21 +145,57 @@ class ConnectionTest {
 		assertKeptOpen("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n");
 	}
 
-	@Test
-	void resetIdleConnectionIsNotLoggedAsError() throws Exception {
+	private interface ClientAction {
+		void run() throws Exception;
+	}
+
+	/**
+	 * Runs the client action, waits for the server to react, and returns what
+	 * the server wrote to System.err meanwhile.
+	 */
+	private static String captureErrors(ClientAction action) throws Exception {
 		ByteArrayOutputStream captured = new ByteArrayOutputStream();
 		PrintStream originalErr = System.err;
 		System.setErr(new PrintStream(captured, true));
 		try {
+			action.run();
+			Thread.sleep(500L);
+		} finally {
+			System.setErr(originalErr);
+		}
+		return captured.toString();
+	}
+
+	@Test
+	void resetIdleConnectionIsNotLoggedAsError() throws Exception {
+		String errors = captureErrors(() -> {
 			Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort());
 			send(socket, "GET / HTTP/1.1\r\nHost: x\r\n\r\n");
 			// Close with a reset rather than a FIN
 			socket.setSoLinger(true, 0);
 			socket.close();
-			Thread.sleep(500);
-		} finally {
-			System.setErr(originalErr);
-		}
-		assertFalse(captured.toString().contains("error while handling"), captured.toString());
+		});
+		assertFalse(errors.contains("error while handling"), errors);
+	}
+
+	@Test
+	void clientLeavingDuringBodyIsNotLoggedAsError() throws Exception {
+		String errors = captureErrors(() -> {
+			try (Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort())) {
+				socket.setSoTimeout(5000);
+				socket.getOutputStream().write("GET /stream HTTP/1.1\r\nHost: x\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+				socket.getInputStream().read(new byte[8192]);
+			}
+		});
+		assertFalse(errors.contains("error while handling"), errors);
+	}
+
+	@Test
+	void applicationErrorIsStillLogged() throws Exception {
+		String errors = captureErrors(() -> {
+			Response response = send("GET /error HTTP/1.1\r\nHost: x\r\n\r\n");
+			assertTrue(response.statusLine.startsWith("HTTP/1.1 500"), response.statusLine);
+		});
+		assertTrue(errors.contains("the application's own error"), errors);
 	}
 }
