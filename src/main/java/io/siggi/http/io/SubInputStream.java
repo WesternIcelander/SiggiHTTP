@@ -1,8 +1,14 @@
 package io.siggi.http.io;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * Reads exactly {@code maxRead} bytes from another stream, then reports end of
+ * stream. If the other stream ends before then, reading throws an
+ * EOFException, because the data is incomplete.
+ */
 public final class SubInputStream extends InputStream {
 
 	private final InputStream in;
@@ -20,7 +26,7 @@ public final class SubInputStream extends InputStream {
 		}
 		int read = in.read();
 		if (read == -1) {
-			return -1;
+			throw endedEarly();
 		}
 		left -= 1;
 		return read;
@@ -38,10 +44,15 @@ public final class SubInputStream extends InputStream {
 		}
 		int max = Math.min(len, (int) Math.min(((long) Integer.MAX_VALUE), left));
 		int amountRead = in.read(b, offset, max);
-		if (amountRead >= 0) {
-			left -= (long) amountRead;
+		if (amountRead == -1) {
+			throw endedEarly();
 		}
+		left -= (long) amountRead;
 		return amountRead;
+	}
+
+	private EOFException endedEarly() {
+		return new EOFException("Stream ended with " + left + " bytes still expected");
 	}
 
 }
