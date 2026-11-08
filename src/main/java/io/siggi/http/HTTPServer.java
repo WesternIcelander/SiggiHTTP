@@ -405,16 +405,28 @@ public final class HTTPServer {
 	private final ReentrantReadWriteLock.ReadLock trustedIPRead = trustedIPLock.readLock();
 	private final ReentrantReadWriteLock.WriteLock trustedIPWrite = trustedIPLock.writeLock();
 
+	/**
+	 * Returns whether the address is in one of the trusted addresses or ranges.
+	 *
+	 * @param ip an IPv4 or IPv6 address, optionally with an IPv6 scope ID such
+	 * as {@code fe80::1%en0}
+	 * @return true if a trusted address or range contains it
+	 * @throws IllegalArgumentException if the address is invalid
+	 */
 	public boolean isIPTrusted(String ip) {
+		int scopeStart = ip.indexOf('%');
+		if (scopeStart != -1) {
+			// Link-local IPv6 addresses from InetAddress.getHostAddress() can carry a scope ID
+			ip = ip.substring(0, scopeStart);
+		}
+		IP ipAddr = IP.getIP(ip);
 		trustedIPRead.lock();
 		try {
-			IP ipAddr = IP.getIP(ip);
-			do {
-				if (trustedIPs.contains(ipAddr)) {
+			for (IP trusted : trustedIPs) {
+				if (trusted.contains(ipAddr)) {
 					return true;
 				}
-				ipAddr = IP.getIP(ipAddr.getFirstIP().toString() + "/" + (ipAddr.getPrefixLength() - 1));
-			} while (ipAddr.getPrefixLength() > 0);
+			}
 			return false;
 		} finally {
 			trustedIPRead.unlock();
