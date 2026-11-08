@@ -80,10 +80,7 @@ final class SessionsMemory extends Sessions {
 				session.lastUse = System.currentTimeMillis();
 				return session;
 			}
-			session = new Session(this, sessionId);
-			sessions.put(sessionId, session);
-			session.lastUse = System.currentTimeMillis();
-			return session;
+			return null;
 		} finally {
 			writeLock.unlock();
 		}

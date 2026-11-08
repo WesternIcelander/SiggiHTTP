@@ -30,6 +30,15 @@ public abstract class Sessions {
 
 	public abstract Session newSession();
 
+	/**
+	 * Gets an existing session.
+	 *
+	 * @param sessionId the session ID
+	 * @return the session, or null if there's no live session with that ID.
+	 * Unknown, expired and deleted IDs return null rather than creating a
+	 * session, so a client can't choose its own session ID. Use
+	 * {@link #newSession()} to start a session.
+	 */
 	public abstract Session get(String sessionId);
 
 	public final boolean hasExpired(Session session) {

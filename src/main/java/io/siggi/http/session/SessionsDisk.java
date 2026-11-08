@@ -166,10 +166,7 @@ final class SessionsDisk extends Sessions {
 					}
 				}
 			}
-			Session session = new Session(this, sessionId);
-			sessions.put(sessionId, new WeakReference<>(session));
-			session.lastUse = System.currentTimeMillis();
-			return session;
+			return null;
 		} finally {
 			writeLock.unlock();
 		}
