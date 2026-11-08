@@ -126,9 +126,6 @@ class ConnectionTest {
 			response.serverClosed = in.read() == -1;
 		} catch (SocketTimeoutException e) {
 			response.serverClosed = false;
-		} catch (IOException e) {
-			// Reset, because the server closed with request bytes still unread
-			response.serverClosed = true;
 		}
 		return response;
 	}
@@ -227,6 +224,27 @@ class ConnectionTest {
 		assertFalse(head.contains("\r\ncontent-length:"), head);
 		assertFalse(head.contains("\r\ntransfer-encoding:"), head);
 		assertEquals(expectedBody, response.substring(split + 4));
+	}
+
+	private static void assertRefused(String response) {
+		assertTrue(response.startsWith("HTTP/1.1 401 Unauthorized\r\n"), response);
+		assertTrue(response.endsWith("\r\n\r\nnot authenticated"), response);
+	}
+
+	@Test
+	void unreadBodyWithConnectionCloseEndsWithoutReset() throws IOException {
+		// A reset would make reading throw "Connection reset" instead of reaching EOF
+		assertRefused(sendAndReadUntilClosed("OPTIONS /refuse HTTP/1.1\r\nHost: x\r\nConnection: close\r\nContent-Length: 12\r\n\r\noverwritten!"));
+		assertRefused(sendAndReadUntilClosed("PUT /refuse HTTP/1.1\r\nHost: x\r\nConnection: close\r\nContent-Length: 12\r\n\r\noverwritten!"));
+	}
+
+	@Test
+	void unreadLargeBodyEndsWithoutReset() throws IOException {
+		StringBuilder request = new StringBuilder("PUT /refuse HTTP/1.1\r\nHost: x\r\nContent-Length: 200000\r\n\r\n");
+		for (int i = 0; i < 200000; i++) {
+			request.append('x');
+		}
+		assertRefused(sendAndReadUntilClosed(request.toString()));
 	}
 
 	@Test

@@ -498,10 +498,48 @@ final class HTTPHandler {
 			}
 		} finally {
 			if (!noAutoClose && !cleanupIsExplicit) {
-				try {
-					sock.close();
-				} catch (Exception e) {
-				}
+				lingeringClose();
+			}
+		}
+	}
+
+	private static final long LINGER_TIME = 2000L;
+	private static final long LINGER_READ_LIMIT = 1048576L;
+
+	/**
+	 * Closes the connection without throwing away the response. Closing a
+	 * socket that still has unread request bytes, such as a body the
+	 * responder didn't read, makes the OS send a reset, and the client can
+	 * lose the end of the response with it. So first stop sending, which the
+	 * client sees as the end of the response, then read and discard what it
+	 * sends until it closes its side, for up to two seconds or 1 MiB, and
+	 * only then close.
+	 */
+	private void lingeringClose() {
+		try {
+			try {
+				out.flush();
+			} catch (Exception ignored) {
+			}
+			if (!(sock instanceof SSLSocket)) {
+				// TLS sockets can't half-close
+				sock.shutdownOutput();
+			}
+			deadlineIn.clearDeadline();
+			deadlineIn.startDeadline(LINGER_TIME);
+			sock.setSoTimeout((int) LINGER_TIME);
+			byte[] buffer = new byte[8192];
+			long discarded = 0L;
+			int amount;
+			while (discarded < LINGER_READ_LIMIT && (amount = in.read(buffer)) != -1) {
+				discarded += amount;
+			}
+		} catch (Exception ignored) {
+			// Timed out, reset, or already closed: close it now either way
+		} finally {
+			try {
+				sock.close();
+			} catch (Exception ignored) {
 			}
 		}
 	}
@@ -539,10 +577,7 @@ final class HTTPHandler {
 		}
 		if (!keepAlive || mustEndConnection) {
 			if (!noAutoClose) {
-				try {
-					sock.close();
-				} catch (Exception e) {
-				}
+				lingeringClose();
 			}
 		} else {
 			startHandlingNewRequest();
