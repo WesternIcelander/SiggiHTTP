@@ -14,13 +14,27 @@ import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * Recognises Cloudflare's IP ranges, so forwarded client IPs from Cloudflare
+ * are trusted. This only works if a file called {@code cloudflare-ips.txt}
+ * exists in the working directory when the class loads. The file is then kept
+ * up to date from cloudflare.com once a week. Without the file, every address
+ * is treated as not being Cloudflare's, and nothing is downloaded or written.
+ *
+ * @deprecated This will be removed in 2.0. Pass the ranges of any proxies you
+ * use, Cloudflare's included, to {@link io.siggi.http.HTTPServer#trustIP(String)}
+ * instead.
+ */
+@Deprecated(since = "1.11", forRemoval = true)
 public class CloudFlare {
+
+	private static final File RANGES_FILE = new File("cloudflare-ips.txt");
+	private static final boolean enabled = RANGES_FILE.exists();
 
 	public static boolean isCloudFlare(InetAddress add) {
 		String address = add.getHostAddress();
 		return isCloudFlare(address);
 	}
-	private static final List<IP> localCloudFlareRanges = new ArrayList<>();
 	private static final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 	private static final Lock readLock = lock.readLock();
 	private static final Lock writeLock = lock.writeLock();
@@ -32,22 +46,8 @@ public class CloudFlare {
 	static {
 		writeLock.lock();
 		try {
-			try (BufferedReader reader = new BufferedReader(new InputStreamReader(CloudFlare.class.getResourceAsStream("/cloudflare.txt")))) {
-				String line;
-				while ((line = reader.readLine()) != null) {
-					if (line.equals("")) {
-						continue;
-					}
-					try {
-						localCloudFlareRanges.add(IP.getIP(line));
-					} catch (Exception e) {
-					}
-				}
-			} catch (Exception e) {
-			}
-			File cfip = new File("cloudflare-ips.txt");
-			if (cfip.exists()) {
-				try (BufferedReader reader = new BufferedReader(new FileReader(cfip))) {
+			if (enabled) {
+				try (BufferedReader reader = new BufferedReader(new FileReader(RANGES_FILE))) {
 					String line = reader.readLine();
 					lastRemoteUpdate = Long.parseLong(line);
 					while ((line = reader.readLine()) != null) {
@@ -62,6 +62,9 @@ public class CloudFlare {
 	}
 
 	public static boolean isCloudFlare(String address) {
+		if (!enabled) {
+			return false;
+		}
 		do {
 			a:
 			{
@@ -76,17 +79,9 @@ public class CloudFlare {
 					} catch (IllegalArgumentException e) {
 						return false;
 					}
-					if (remoteCloudFlareRanges.isEmpty()) {
-						for (IP ip : localCloudFlareRanges) {
-							if (ip.contains(check)) {
-								return true;
-							}
-						}
-					} else {
-						for (IP ip : remoteCloudFlareRanges) {
-							if (ip.contains(check)) {
-								return true;
-							}
+					for (IP ip : remoteCloudFlareRanges) {
+						if (ip.contains(check)) {
+							return true;
 						}
 					}
 					return false;
@@ -143,7 +138,7 @@ public class CloudFlare {
 			try {
 				remoteCloudFlareRanges.clear();
 				remoteCloudFlareRanges.addAll(newOnes);
-				try (FileWriter fw = new FileWriter(new File("cloudflare-ips.txt"))) {
+				try (FileWriter fw = new FileWriter(RANGES_FILE)) {
 					fw.write(Long.toString(System.currentTimeMillis()) + "\n");
 					for (IP ip : newOnes) {
 						fw.write(ip.toString() + "\n");
