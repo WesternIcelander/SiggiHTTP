@@ -106,6 +106,86 @@ public class HTTPResponse extends OutputStream {
 		returnFile(file, null);
 	}
 
+	/**
+	 * Returned by {@link #parseRange(String, long)} when the range doesn't
+	 * overlap the file, which calls for a 416.
+	 */
+	static final long[] RANGE_NOT_SATISFIABLE = new long[0];
+
+	/**
+	 * Parses a Range header for a single byte range, following RFC 9110
+	 * section 14.1.2.
+	 *
+	 * @param header the Range header value
+	 * @param fileLength the length of the file being served
+	 * @return the first and last byte positions, with the last one clamped to
+	 * the end of the file; {@link #RANGE_NOT_SATISFIABLE} if the range starts
+	 * past the end of the file or is an empty suffix; or null if the whole file
+	 * should be sent instead, because the header is malformed, asks for more
+	 * than one range or uses a unit other than bytes
+	 */
+	static long[] parseRange(String header, long fileLength) {
+		int equals = header.indexOf('=');
+		if (equals == -1 || !header.substring(0, equals).trim().equalsIgnoreCase("bytes")) {
+			return null;
+		}
+		String spec = header.substring(equals + 1).trim();
+		int dash = spec.indexOf('-');
+		if (dash == -1 || spec.indexOf(',') != -1) {
+			return null;
+		}
+		String first = spec.substring(0, dash).trim();
+		String last = spec.substring(dash + 1).trim();
+		if (first.isEmpty()) {
+			// A suffix range: the last N bytes
+			if (!isDigits(last)) {
+				return null;
+			}
+			long suffixLength = parsePosition(last);
+			if (suffixLength == 0L || fileLength == 0L) {
+				return RANGE_NOT_SATISFIABLE;
+			}
+			return new long[]{Math.max(0L, fileLength - suffixLength), fileLength - 1};
+		}
+		if (!isDigits(first) || (!last.isEmpty() && !isDigits(last))) {
+			return null;
+		}
+		long start = parsePosition(first);
+		long end = last.isEmpty() ? Long.MAX_VALUE : parsePosition(last);
+		if (end < start) {
+			return null;
+		}
+		if (start >= fileLength) {
+			return RANGE_NOT_SATISFIABLE;
+		}
+		return new long[]{start, Math.min(end, fileLength - 1)};
+	}
+
+	private static boolean isDigits(String str) {
+		if (str.isEmpty()) {
+			return false;
+		}
+		for (int i = 0; i < str.length(); i++) {
+			char c = str.charAt(i);
+			if (c < '0' || c > '9') {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Parses a byte position, treating one too big for a long as past the end
+	 * of any file.
+	 */
+	private static long parsePosition(String digits) {
+		try {
+			return Long.parseLong(digits);
+		} catch (NumberFormatException e) {
+			return Long.MAX_VALUE;
+		}
+	}
+
 	public void returnFile(File file, String contentType) throws IOException {
 		throwIOIfClosed();
 		if (!file.exists()) {
@@ -129,35 +209,10 @@ public class HTTPResponse extends OutputStream {
 			}
 			return;
 		}
-		boolean partialContent = false;
-		long partialStart = 0L;
-		long partialEnd = 0L;
+		String rangeHeader = null;
 		List<String> rangeHeaders = request.headers.get("Range");
-		if (rangeHeaders != null && !rangeHeaders.isEmpty()) {
-			try {
-				if (rangeHeaders.size() == 1) {
-					String rangeHeader = rangeHeaders.get(0);
-					if (rangeHeader.startsWith("bytes=")) {
-						rangeHeader = rangeHeader.substring(6).trim();
-						int pos = rangeHeader.indexOf("-");
-						if (pos == -1) {
-							partialStart = Long.parseLong(rangeHeader);
-							partialContent = true;
-						} else {
-							String l = rangeHeader.substring(0, pos);
-							String r = rangeHeader.substring(pos + 1);
-							partialStart = Long.parseLong(l);
-							if (r.isEmpty()) {
-								partialEnd = -1L;
-							} else {
-								partialEnd = Long.parseLong(r);
-							}
-							partialContent = true;
-						}
-					}
-				}
-			} catch (Exception e) {
-			}
+		if (rangeHeaders != null && rangeHeaders.size() == 1) {
+			rangeHeader = rangeHeaders.get(0);
 		}
 		String eTag = null;
 		String extension = "";
@@ -182,7 +237,7 @@ public class HTTPResponse extends OutputStream {
 			if (rangeETag != null && !rangeETag.isEmpty()) {
 				String theETag = rangeETag.get(0);
 				if (!theETag.equals(eTag) && !theETag.equals("\"" + eTag + "\"")) {
-					partialContent = false;
+					rangeHeader = null;
 				}
 			}
 		}
@@ -204,20 +259,20 @@ public class HTTPResponse extends OutputStream {
 		if (sendFile) {
 			try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
 				long fileLength = raf.length();
-				if (partialContent) {
-					if (partialEnd == -1L) {
-						partialEnd = fileLength - 1;
-					}
-					if (partialEnd < partialStart || partialEnd > fileLength - 1) {
-						partialContent = false;
-					}
+				long[] range = rangeHeader == null ? null : parseRange(rangeHeader, fileLength);
+				if (range == RANGE_NOT_SATISFIABLE) {
+					setHeader("416 Range Not Satisfiable");
+					setHeader("Content-Range", "bytes */" + fileLength);
+					setHeader("Content-Length", "0");
+					sendHeaders();
+					return;
 				}
 				long amountToWrite = fileLength;
-				if (partialContent) {
-					raf.seek(partialStart);
-					amountToWrite = partialEnd - partialStart + 1;
+				if (range != null) {
+					raf.seek(range[0]);
+					amountToWrite = range[1] - range[0] + 1;
 					setHeader("206 Partial Content");
-					setHeader("Content-Range", "bytes " + partialStart + "-" + partialEnd + "/" + fileLength);
+					setHeader("Content-Range", "bytes " + range[0] + "-" + range[1] + "/" + fileLength);
 				} else {
 					setHeader("200 OK");
 				}
