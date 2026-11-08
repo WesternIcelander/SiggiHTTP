@@ -84,6 +84,28 @@ public class HTTPResponse extends OutputStream {
 		}
 	}
 
+	/**
+	 * Sends the body with neither a Content-Length nor chunked transfer
+	 * encoding, so that it ends when the server closes the connection (a
+	 * close-delimited body, RFC 9112 section 6.3). This suits endless streams
+	 * for clients that need a raw body. The response says
+	 * {@code Connection: close}, and the connection is closed when the
+	 * response ends, including when it's ended from another thread after
+	 * {@link HTTPRequest#openResponse()}. Calling
+	 * {@link #contentLength(long)} afterwards switches back to a fixed length
+	 * or chunked body, but the connection is still closed afterwards.
+	 *
+	 * @throws IllegalStateException if the headers have already been sent
+	 */
+	public void closeDelimited() {
+		throwIllegalIfClosed();
+		if (request.handler.wrote) {
+			throw new IllegalStateException("Headers already sent, and cannot be modified!");
+		}
+		request.handler.closeDelimited();
+		chunked = false;
+	}
+
 	public void setContentType(String contentType) {
 		throwIllegalIfClosed();
 		if (contentType.equals("text/html")) {

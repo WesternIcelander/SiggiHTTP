@@ -1070,6 +1070,15 @@ final class HTTPHandler {
 		}
 	}
 
+	void closeDelimited() {
+		deleteHeader("Content-Length");
+		deleteHeader("Transfer-Encoding");
+		chunked = false;
+		// The body only ends when the connection does, so it can't be reused
+		cannotKeepAlive = true;
+		keepAlive(false);
+	}
+
 	void deleteHeader(String key) {
 		key = headerName(key);
 		headers.remove(key);

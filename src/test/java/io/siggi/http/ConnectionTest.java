@@ -9,6 +9,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,23 @@ class ConnectionTest {
 				}
 			} catch (IOException | InterruptedException e) {
 			}
+		});
+		server.getResponderRegistry(null).register("/close-delimited", request -> {
+			request.response.closeDelimited();
+			request.response.write("raw body".getBytes(StandardCharsets.UTF_8));
+		});
+		server.getResponderRegistry(null).register("/close-delimited-async", request -> {
+			HTTPResponse response = request.openResponse();
+			response.closeDelimited();
+			Thread writer = new Thread(() -> {
+				try {
+					Thread.sleep(100L);
+					response.write("from another thread".getBytes(StandardCharsets.UTF_8));
+					response.close();
+				} catch (Exception e) {
+				}
+			});
+			writer.start();
 		});
 		server.getResponderRegistry(null).register("/error", request -> {
 			throw new IOException("the application's own error");
@@ -143,6 +161,43 @@ class ConnectionTest {
 	void http10ClosesUnlessKeepAliveAsked() throws IOException {
 		assertClosed("GET / HTTP/1.0\r\n\r\n");
 		assertKeptOpen("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n");
+	}
+
+	/**
+	 * Sends a request and reads until the server closes the connection.
+	 */
+	private String sendAndReadUntilClosed(String request) throws IOException {
+		try (Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort())) {
+			socket.setSoTimeout(5000);
+			socket.getOutputStream().write(request.getBytes(StandardCharsets.UTF_8));
+			ByteArrayOutputStream received = new ByteArrayOutputStream();
+			byte[] buffer = new byte[8192];
+			int amount;
+			while ((amount = socket.getInputStream().read(buffer)) != -1) {
+				received.write(buffer, 0, amount);
+			}
+			return new String(received.toByteArray(), StandardCharsets.ISO_8859_1);
+		}
+	}
+
+	private static void assertCloseDelimited(String response, String expectedBody) {
+		int split = response.indexOf("\r\n\r\n");
+		String head = response.substring(0, split).toLowerCase(Locale.ROOT);
+		assertTrue(head.startsWith("http/1.1 200 ok"), head);
+		assertTrue(head.contains("\r\nconnection: close"), head);
+		assertFalse(head.contains("\r\ncontent-length:"), head);
+		assertFalse(head.contains("\r\ntransfer-encoding:"), head);
+		assertEquals(expectedBody, response.substring(split + 4));
+	}
+
+	@Test
+	void closeDelimitedBody() throws IOException {
+		assertCloseDelimited(sendAndReadUntilClosed("GET /close-delimited HTTP/1.1\r\nHost: x\r\n\r\n"), "raw body");
+	}
+
+	@Test
+	void closeDelimitedBodyEndedFromAnotherThread() throws IOException {
+		assertCloseDelimited(sendAndReadUntilClosed("GET /close-delimited-async HTTP/1.1\r\nHost: x\r\n\r\n"), "from another thread");
 	}
 
 	private interface ClientAction {
