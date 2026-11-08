@@ -666,6 +666,7 @@ final class HTTPHandler {
 				deadlineIn.clearDeadline();
 			}
 			String expect = null;
+			boolean clientAskedForKeepAlive = false;
 			for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
 				String key = entry.getKey();
 				for (String val : entry.getValue()) {
@@ -729,8 +730,13 @@ final class HTTPHandler {
 					} else if (key.equalsIgnoreCase("User-Agent")) {
 						userAgent = val;
 					} else if (key.equalsIgnoreCase("Connection")) {
-						if (val.equalsIgnoreCase("close")) {
-							cannotKeepAlive = true;
+						for (String option : val.split(",")) {
+							option = option.trim();
+							if (option.equalsIgnoreCase("close")) {
+								cannotKeepAlive = true;
+							} else if (option.equalsIgnoreCase("keep-alive")) {
+								clientAskedForKeepAlive = true;
+							}
 						}
 					} else if (key.equalsIgnoreCase("Expect")) {
 						expect = val;
@@ -739,6 +745,11 @@ final class HTTPHandler {
 			}
 			if (forceHost != null) {
 				host = forceHost;
+			}
+			if (!httpVersion.equals("HTTP/1.1") && !clientAskedForKeepAlive) {
+				// Before HTTP/1.1, a connection only persists if the client asks for it
+				// (RFC 9112 section 9.3)
+				cannotKeepAlive = true;
 			}
 			try {
 				incomingContentLength = getRequestBodyLength(headers);
@@ -939,6 +950,10 @@ final class HTTPHandler {
 						mustEndConnection = true;
 					}
 				});
+			}
+			if (cannotKeepAlive) {
+				// resetHeaders() already offered keep-alive before the request said otherwise
+				keepAlive(false);
 			}
 			processHTTP(req);
 		} finally {
