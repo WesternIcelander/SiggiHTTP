@@ -1,8 +1,10 @@
 package io.siggi.http;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -124,5 +126,23 @@ class ConnectionTest {
 	void http10ClosesUnlessKeepAliveAsked() throws IOException {
 		assertClosed("GET / HTTP/1.0\r\n\r\n");
 		assertKeptOpen("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n");
+	}
+
+	@Test
+	void resetIdleConnectionIsNotLoggedAsError() throws Exception {
+		ByteArrayOutputStream captured = new ByteArrayOutputStream();
+		PrintStream originalErr = System.err;
+		System.setErr(new PrintStream(captured, true));
+		try {
+			Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort());
+			send(socket, "GET / HTTP/1.1\r\nHost: x\r\n\r\n");
+			// Close with a reset rather than a FIN
+			socket.setSoLinger(true, 0);
+			socket.close();
+			Thread.sleep(500);
+		} finally {
+			System.setErr(originalErr);
+		}
+		assertFalse(captured.toString().contains("error while handling"), captured.toString());
 	}
 }

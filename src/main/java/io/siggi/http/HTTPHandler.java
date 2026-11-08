@@ -434,6 +434,10 @@ final class HTTPHandler {
 					} catch (TooBigException ex) {
 						requestUriTooBig();
 						break;
+					} catch (IOException ex) {
+						// The connection was reset, or the socket was closed under us, while waiting
+						// for a request. That's a normal way for an idle keep-alive connection to end.
+						break theLoop;
 					}
 					send408 = false;
 					int s = request.indexOf(" ");
