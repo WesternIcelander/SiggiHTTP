@@ -566,7 +566,14 @@ public final class HTMLUtils {
 			} else if (c == '〈') {
 				appendEntity(html, sb, c, "&lang;");
 			} else // </editor-fold>
-			if (Character.UnicodeBlock.of(c) != Character.UnicodeBlock.BASIC_LATIN) {
+			if (Character.isHighSurrogate(c) && i + 1 < n && Character.isLowSurrogate(s.charAt(i + 1))) {
+				// A character outside the BMP, such as an emoji, takes two chars;
+				// escape the code point they encode, not each half on its own
+				sb.append("&#");
+				sb.append(Character.toCodePoint(c, s.charAt(i + 1)));
+				sb.append(';');
+				i++;
+			} else if (Character.UnicodeBlock.of(c) != Character.UnicodeBlock.BASIC_LATIN) {
 				sb.append("&#");
 				sb.append((int) c);
 				sb.append(';');
