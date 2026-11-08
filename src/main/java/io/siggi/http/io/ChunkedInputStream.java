@@ -134,6 +134,16 @@ public final class ChunkedInputStream extends InputStream {
 		return readAmount;
 	}
 
+	/**
+	 * Returns whether the whole body, up to and including the last chunk, has
+	 * been read.
+	 *
+	 * @return true if reading has reached the end of the body
+	 */
+	public boolean isFinished() {
+		return endOfStream;
+	}
+
 	public boolean didReceiveTerminatorChunk() {
 		return receivedTerminatorChunk;
 	}

@@ -61,6 +61,11 @@ class ConnectionTest {
 			});
 			writer.start();
 		});
+		server.getResponderRegistry(null).register("/refuse", request -> {
+			// Answers without reading the request body, like an auth check
+			request.response.setHeader("401 Unauthorized");
+			request.response.send("not authenticated");
+		});
 		server.getResponderRegistry(null).register("/error", request -> {
 			throw new IOException("the application's own error");
 		});
@@ -121,6 +126,9 @@ class ConnectionTest {
 			response.serverClosed = in.read() == -1;
 		} catch (SocketTimeoutException e) {
 			response.serverClosed = false;
+		} catch (IOException e) {
+			// Reset, because the server closed with request bytes still unread
+			response.serverClosed = true;
 		}
 		return response;
 	}
@@ -161,6 +169,37 @@ class ConnectionTest {
 	void http10ClosesUnlessKeepAliveAsked() throws IOException {
 		assertClosed("GET / HTTP/1.0\r\n\r\n");
 		assertKeptOpen("GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n");
+	}
+
+	@Test
+	void unreadSmallBodyIsDrainedAndConnectionReused() throws IOException {
+		try (Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort())) {
+			String body = "{\"currentPassword\":\"x\",\"newPassword\":\"y\"}";
+			Response refused = send(socket, "POST /refuse HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: "
+					+ body.length() + "\r\n\r\n" + body);
+			assertEquals("HTTP/1.1 401 Unauthorized", refused.statusLine);
+			assertEquals("Keep-Alive", refused.connection);
+			assertFalse(refused.serverClosed, "server should keep the connection open");
+			Response next = send(socket, "GET / HTTP/1.1\r\nHost: x\r\n\r\n");
+			assertEquals("HTTP/1.1 200 OK", next.statusLine);
+		}
+	}
+
+	@Test
+	void unreadLargeBodyIsAnnouncedAsClose() throws IOException {
+		// Only part of the declared body is sent; the server mustn't wait for the rest
+		Response response = send("POST /refuse HTTP/1.1\r\nHost: x\r\nContent-Length: 1000000\r\n\r\nabc");
+		assertEquals("HTTP/1.1 401 Unauthorized", response.statusLine);
+		assertEquals("close", response.connection);
+		assertTrue(response.serverClosed, "server should close the connection");
+	}
+
+	@Test
+	void unreadChunkedBodyIsAnnouncedAsClose() throws IOException {
+		Response response = send("POST /refuse HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n");
+		assertEquals("HTTP/1.1 401 Unauthorized", response.statusLine);
+		assertEquals("close", response.connection);
+		assertTrue(response.serverClosed, "server should close the connection");
 	}
 
 	/**

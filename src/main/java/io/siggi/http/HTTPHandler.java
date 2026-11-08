@@ -630,6 +630,7 @@ final class HTTPHandler {
 	}
 
 	private void processRequest(String request) throws Exception {
+		requestBody = null;
 		EOFInputStream contentStream = null;
 		HTTPRequest req = null;
 		try {
@@ -813,6 +814,7 @@ final class HTTPHandler {
 					stream = new SubInputStream(in, incomingContentLength);
 				}
 				contentStream = new EOFInputStream(stream);
+				requestBody = stream;
 			}
 			if (contentStream != null) {
 				if (!server.isIgnoringMultipartFormData() && incomingContentType.toLowerCase().contains("multipart/form-data")) { // MULTIPART FORM
@@ -952,13 +954,32 @@ final class HTTPHandler {
 			if (contentStream != null) {
 				final EOFInputStream finalContentStream = contentStream;
 				cleanupTasks.add(() -> {
-					finalContentStream.setEofSequence(null);
-					int read = -1;
-					try {
-						read = finalContentStream.read();
-					} catch (Exception e) {
+					if (!keepAlive) {
+						// The connection is closing anyway, so don't read the rest
+						return;
 					}
-					if (read != -1) {
+					// The response promised keep-alive, which writeHeaders() only
+					// does when what's left of the body is small, so read the
+					// rest of it to reach the next request.
+					finalContentStream.setEofSequence(null);
+					try {
+						int oldTimeout = sock.getSoTimeout();
+						sock.setSoTimeout(UNREAD_BODY_DRAIN_TIMEOUT);
+						try {
+							byte[] buffer = new byte[4096];
+							long drained = 0L;
+							int amount;
+							while ((amount = finalContentStream.read(buffer)) != -1) {
+								drained += amount;
+								if (drained > UNREAD_BODY_DRAIN_LIMIT) {
+									mustEndConnection = true;
+									return;
+								}
+							}
+						} finally {
+							sock.setSoTimeout(oldTimeout);
+						}
+					} catch (Exception e) {
 						mustEndConnection = true;
 					}
 				});
@@ -1116,6 +1137,13 @@ final class HTTPHandler {
 		if (wrote) {
 			return;
 		}
+		if (keepAlive && !requestBodyCanBeDrained()) {
+			// Too much of the request body is unread to skip over it after the
+			// response, so the connection will have to close; say so now,
+			// rather than promise keep-alive and break it
+			cannotKeepAlive = true;
+			keepAlive(false);
+		}
 		wrote = true;
 		out.startBuffering();
 		Util.writeCRLF("HTTP/1.1 " + responseHeader, out);
@@ -1224,6 +1252,34 @@ final class HTTPHandler {
 	private InetAddress inetAddress;
 	String ip;
 	private boolean mustEndConnection = false;
+
+	/**
+	 * The most request body that's read and thrown away after the response,
+	 * when the responder didn't read it, to keep the connection open.
+	 */
+	static final long UNREAD_BODY_DRAIN_LIMIT = 65536L;
+	private static final int UNREAD_BODY_DRAIN_TIMEOUT = 5000;
+
+	/**
+	 * The current request's body as framed on the wire, before any wrapping,
+	 * or null if there isn't one.
+	 */
+	private InputStream requestBody = null;
+
+	/**
+	 * Returns whether what's left of the request body is small enough to
+	 * read and throw away after the response.
+	 */
+	private boolean requestBodyCanBeDrained() {
+		if (requestBody instanceof SubInputStream) {
+			return ((SubInputStream) requestBody).getRemaining() <= UNREAD_BODY_DRAIN_LIMIT;
+		} else if (requestBody instanceof ChunkedInputStream) {
+			// Chunked bodies don't say how much is left
+			return ((ChunkedInputStream) requestBody).isFinished();
+		}
+		return true;
+	}
+
 	private boolean noAutoClose = false;
 	private boolean keepAlive = true;
 	private boolean cannotKeepAlive = false;

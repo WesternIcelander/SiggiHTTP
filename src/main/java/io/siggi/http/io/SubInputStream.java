@@ -51,6 +51,15 @@ public final class SubInputStream extends InputStream {
 		return amountRead;
 	}
 
+	/**
+	 * Returns how many bytes are still to be read.
+	 *
+	 * @return the number of bytes left
+	 */
+	public long getRemaining() {
+		return left;
+	}
+
 	private EOFException endedEarly() {
 		return new EOFException("Stream ended with " + left + " bytes still expected");
 	}
