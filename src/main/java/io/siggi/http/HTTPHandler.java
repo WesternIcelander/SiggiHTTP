@@ -247,39 +247,59 @@ final class HTTPHandler {
 	private void badRequest() throws IOException {
 		resetHeaders();
 		String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>400 Bad Request</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>400 Bad Request</h1><br>\nThe server could not understand your request.<br>\n<br>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
-		byte pageBytes[] = getBytes(page);
-		setHeader("400 Bad Request");
-		setHeader("Content-Length", Integer.toString(pageBytes.length));
-		setHeader("Content-Type", "text/html; charset=utf-8");
-		keepAlive(false);
-		writeHeaders(true);
-		out.write(pageBytes);
-		out.flush();
+		sendErrorPage(400, "Bad Request", page, null);
 	}
 
 	private void requestUriTooBig() throws IOException {
 		resetHeaders();
 		String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>414 Request URI Too Long</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>414 Request URI Too Long</h1><br>\nThat's what she said!<br>\n<br>\nThe request URI you submitted is too large for this server to handle!<br>\n<br>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
-		byte pageBytes[] = getBytes(page);
-		setHeader("414 Request URI Too Long");
-		setHeader("Content-Length", Integer.toString(pageBytes.length));
-		setHeader("Content-Type", "text/html; charset=utf-8");
-		keepAlive(false);
-		writeHeaders(true);
-		out.write(pageBytes);
-		out.flush();
+		sendErrorPage(414, "Request URI Too Long", page, null);
 	}
 
 	private void tooBig() throws IOException {
 		resetHeaders();
 		String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>413 Request Entity Too Large</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>413 Request Entity Too Large</h1><br>\nThat's what she said!<br>\n<br>\nThe data you submitted is too large for this server to handle!<br>\n<br>\n<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
-		byte pageBytes[] = getBytes(page);
-		setHeader("413 Request Entity Too Large");
-		setHeader("Content-Length", Integer.toString(pageBytes.length));
-		setHeader("Content-Type", "text/html; charset=utf-8");
+		sendErrorPage(413, "Request Entity Too Large", page, null);
+	}
+
+	/**
+	 * Sends an error response the server builds itself, after letting the
+	 * error page handler, if there is one, add headers or replace the page.
+	 * The connection is closed afterwards.
+	 *
+	 * @param defaultHtml the built-in page, or null for an empty body
+	 * @param exception the exception behind a 500, or null
+	 */
+	private void sendErrorPage(int code, String reason, String defaultHtml, Throwable exception) throws IOException {
+		ErrorPage page = new ErrorPage(code, reason, host, exception, defaultHtml);
+		ErrorPageHandler handler = server.getErrorPageHandler();
+		if (handler != null) {
+			try {
+				handler.handle(page);
+			} catch (Throwable t) {
+				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+				t.printStackTrace(new PrintStream(baos, true));
+				System.err.print("SiggiHTTP: the error page handler failed, sending the built-in page: " + new String(baos.toByteArray()));
+				page = new ErrorPage(code, reason, host, exception, defaultHtml);
+			}
+		}
+		setHeader(code + " " + reason);
+		for (Map.Entry<String, List<String>> entry : page.getHeaders().entrySet()) {
+			deleteHeader(entry.getKey());
+			for (String value : entry.getValue()) {
+				addHeader(entry.getKey(), value);
+			}
+		}
+		byte[] body = page.body();
+		if (page.getContentType() == null) {
+			deleteHeader("Content-Type");
+		} else {
+			setHeader("Content-Type", page.getContentType());
+		}
+		setHeader("Content-Length", Integer.toString(body.length));
 		keepAlive(false);
 		writeHeaders(true);
-		out.write(pageBytes);
+		out.write(body);
 		out.flush();
 	}
 
@@ -418,6 +438,9 @@ final class HTTPHandler {
 					responseBuffered = true;
 					keepAlive = false;
 					resetHeaders();
+					// Cleared so an error before the next request's Host header
+					// doesn't report the previous request's host
+					host = null;
 					deadlineIn.clearDeadline();
 					String request = "";
 					send408 = true;
@@ -476,13 +499,7 @@ final class HTTPHandler {
 								details = "An error has occurred. The details have been logged on the server.<br>\n";
 							}
 							String page = "<!DOCTYPE html>\n<html>\n<head>\n<title>500 Internal Server Error</title>\n" + DefaultResponder.STYLE + "</head>\n<body>\n<h1>500 Internal Server Error</h1><br>\n*puke* ugh, I feel sick.<p>" + details + "<hr>\n" + server.getServerSignature(host) + "<br>\n</body>\n</html>";
-							byte pageBytes[] = getBytes(page);
-							setHeader("500 Internal Server Error");
-							setHeader("Content-Length", Integer.toString(pageBytes.length));
-							setHeader("Content-Type", "text/html; charset=utf-8");
-							setHeader("Connection", "close");
-							writeHeaders(true);
-							out.write(pageBytes);
+							sendErrorPage(500, "Internal Server Error", page, e);
 						} catch (Exception e2) {
 						}
 					}
@@ -546,11 +563,7 @@ final class HTTPHandler {
 
 	private void requestTimeout() {
 		try {
-			setHeader("408 Request Timeout");
-			setHeader("Content-Length", "0");
-			setHeader("Connection", "close");
-			writeHeaders(false);
-			out.flush();
+			sendErrorPage(408, "Request Timeout", null, null);
 		} catch (Exception ignored) {
 		}
 	}

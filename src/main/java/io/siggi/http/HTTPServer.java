@@ -514,6 +514,30 @@ public final class HTTPServer {
 		fillDefaultResponders();
 	}
 
+	private volatile ErrorPageHandler errorPageHandler = null;
+
+	/**
+	 * Sets the handler that customises the error responses the server builds
+	 * itself (400, 408, 413, 414, and 500 when a responder throws), for
+	 * example to add security headers to them.
+	 *
+	 * @param errorPageHandler the handler, or null to send the built-in pages
+	 * unchanged
+	 */
+	public void setErrorPageHandler(ErrorPageHandler errorPageHandler) {
+		this.errorPageHandler = errorPageHandler;
+	}
+
+	/**
+	 * Returns the handler set with
+	 * {@link #setErrorPageHandler(ErrorPageHandler)}, or null.
+	 *
+	 * @return the error page handler, or null
+	 */
+	public ErrorPageHandler getErrorPageHandler() {
+		return errorPageHandler;
+	}
+
 	public HTTPResponder getDefaultHandler(int code) {
 		HTTPResponder r = defaultResponders.get(code);
 		if (r == null) {
