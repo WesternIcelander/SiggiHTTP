@@ -271,6 +271,36 @@ class ConnectionTest {
 	}
 
 	@Test
+	void malformedRequestLineGets400AndClose() throws IOException {
+		String[] requests = {
+			"THIS IS NOT HTTP\r\n\r\n",
+			"GET / NOTHTTP\r\n\r\n",
+			"GARBAGE\r\n\r\n",
+			"GET HTTP/1.1\r\nHost: x\r\n\r\n",
+			" / HTTP/1.1\r\nHost: x\r\n\r\n",
+		};
+		ByteArrayOutputStream captured = new ByteArrayOutputStream();
+		PrintStream originalErr = System.err;
+		System.setErr(new PrintStream(captured, true));
+		try {
+			for (String request : requests) {
+				// Reading until EOF also checks that the server closes the connection
+				String response = sendAndReadUntilClosed(request);
+				assertTrue(response.startsWith("HTTP/1.1 400 Bad Request\r\n"), request + " -> " + response);
+			}
+		} finally {
+			System.setErr(originalErr);
+		}
+		assertFalse(captured.toString().contains("error while handling"), captured.toString());
+	}
+
+	@Test
+	void http09RequestGetsPlainTextAndClose() throws IOException {
+		String response = sendAndReadUntilClosed("GET /\r\n");
+		assertTrue(response.startsWith("Please send a full HTTP request."), response);
+	}
+
+	@Test
 	void closeDelimitedBody() throws IOException {
 		assertCloseDelimited(sendAndReadUntilClosed("GET /close-delimited HTTP/1.1\r\nHost: x\r\n\r\n"), "raw body");
 	}

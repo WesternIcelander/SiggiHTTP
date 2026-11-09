@@ -682,14 +682,31 @@ final class HTTPHandler {
 		EOFInputStream contentStream = null;
 		HTTPRequest req = null;
 		try {
-			String method = request.substring(0, request.indexOf(" "));
+			int firstSpace = request.indexOf(' ');
+			int lastSpace = request.lastIndexOf(' ');
+			if (firstSpace <= 0) {
+				// No method, or nothing but a method
+				badRequest();
+				return;
+			}
+			String method = request.substring(0, firstSpace);
 			String requestURI;
-			String httpVersion = "HTTP/0.0";
-			if (request.substring(request.lastIndexOf(" ") + 1).startsWith("HTTP/")) {
-				requestURI = request.substring(request.indexOf(" ") + 1, request.lastIndexOf(" "));
-				httpVersion = request.substring(request.lastIndexOf(" ") + 1);
-			} else {
+			String httpVersion;
+			boolean endsWithVersion = request.substring(lastSpace + 1).startsWith("HTTP/");
+			if (firstSpace != lastSpace && endsWithVersion) {
+				requestURI = request.substring(firstSpace + 1, lastSpace);
+				httpVersion = request.substring(lastSpace + 1);
+			} else if (firstSpace == lastSpace && !endsWithVersion) {
+				// An HTTP/0.9 request, just a method and a path. HTTP/0.9 responses
+				// have no status line or headers and end when the connection
+				// closes, so answer in plain text and close.
 				out.write(("Please send a full HTTP request.  If you are seeing this message, you may have an out of date browser.").getBytes());
+				cannotKeepAlive = true;
+				keepAlive(false);
+				return;
+			} else {
+				// Not HTTP/0.9, and doesn't end with an HTTP version
+				badRequest();
 				return;
 			}
 			Map<String, String> get = new HashMap<>();
