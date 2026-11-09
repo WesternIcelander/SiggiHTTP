@@ -1264,6 +1264,10 @@ final class HTTPHandler {
 		return (InetSocketAddress) sock.getLocalSocketAddress();
 	}
 
+	InetSocketAddress getNextHopAddress() {
+		return (InetSocketAddress) sock.getRemoteSocketAddress();
+	}
+
 	boolean isSocketSecure() {
 		return (sock instanceof SSLSocket);
 	}

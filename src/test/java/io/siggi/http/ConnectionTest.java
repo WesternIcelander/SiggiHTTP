@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -65,6 +66,10 @@ class ConnectionTest {
 			// Answers without reading the request body, like an auth check
 			request.response.setHeader("401 Unauthorized");
 			request.response.send("not authenticated");
+		});
+		server.getResponderRegistry(null).register("/addresses", request -> {
+			InetSocketAddress nextHop = request.getNextHopAddress();
+			request.response.send(request.getIPAddress() + " " + nextHop.getAddress().getHostAddress() + " " + nextHop.getPort());
 		});
 		server.getResponderRegistry(null).register("/error", request -> {
 			throw new IOException("the application's own error");
@@ -245,6 +250,24 @@ class ConnectionTest {
 			request.append('x');
 		}
 		assertRefused(sendAndReadUntilClosed(request.toString()));
+	}
+
+	@Test
+	void nextHopAddressIsTheSocketPeerNotTheForwardedAddress() throws IOException {
+		try (Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort())) {
+			socket.setSoTimeout(5000);
+			// Loopback is a trusted proxy, so X-Forwarded-For sets getIPAddress()
+			socket.getOutputStream().write("GET /addresses HTTP/1.1\r\nHost: x\r\nX-Forwarded-For: 203.0.113.9\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+			ByteArrayOutputStream received = new ByteArrayOutputStream();
+			byte[] buffer = new byte[8192];
+			int amount;
+			while ((amount = socket.getInputStream().read(buffer)) != -1) {
+				received.write(buffer, 0, amount);
+			}
+			String response = new String(received.toByteArray(), StandardCharsets.ISO_8859_1);
+			String body = response.substring(response.indexOf("\r\n\r\n") + 4);
+			assertEquals("203.0.113.9 127.0.0.1 " + socket.getLocalPort(), body);
+		}
 	}
 
 	@Test

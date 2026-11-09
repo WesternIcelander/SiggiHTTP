@@ -124,6 +124,19 @@ public class HTTPRequest {
 	}
 
 	/**
+	 * Returns the address and port of the other end of this connection: the
+	 * client if it connected directly, or the nearest proxy if it came through
+	 * one. Unlike {@link #getIPAddress()}, this never comes from a forwarding
+	 * header such as {@code X-Forwarded-For}, so it can be used to apply your
+	 * own rules about which proxies to trust.
+	 *
+	 * @return the address of the next hop towards the client
+	 */
+	public InetSocketAddress getNextHopAddress() {
+		return handler.getNextHopAddress();
+	}
+
+	/**
 	 * Returns the Address that the User Agent has connected to.
 	 *
 	 * @return the InetSocketAddress
