@@ -39,6 +39,9 @@ public final class SubInputStream extends InputStream {
 
 	@Override
 	public int read(byte[] b, int offset, int len) throws IOException {
+		if (len == 0) {
+			return 0;
+		}
 		if (left == 0L) {
 			return -1;
 		}

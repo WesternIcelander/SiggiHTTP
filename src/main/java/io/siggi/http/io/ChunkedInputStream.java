@@ -103,6 +103,9 @@ public final class ChunkedInputStream extends InputStream {
 
 	@Override
 	public int read(byte[] buffer, int offset, int length) throws IOException {
+		if (length == 0) {
+			return 0;
+		}
 		if (endOfStream) {
 			return -1;
 		}

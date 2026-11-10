@@ -115,6 +115,9 @@ public class SecureBufferedInputStream extends InputStream {
 	@Override
 	public int read(byte[] b, int o, int l) throws IOException {
 		getIn();
+		if (l == 0) {
+			return 0;
+		}
 		if (readPos >= writePos) {
 			fill();
 			if (readPos >= writePos) {

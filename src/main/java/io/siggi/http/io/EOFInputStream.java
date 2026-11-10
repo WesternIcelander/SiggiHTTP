@@ -94,6 +94,9 @@ public final class EOFInputStream extends InputStream {
 
 	@Override
 	public int read(byte[] b, int offset, int length) throws IOException {
+		if (length == 0) {
+			return 0;
+		}
 		int x = read0(b, offset, length);
 		if (x <= 0) {
 			x = -1;

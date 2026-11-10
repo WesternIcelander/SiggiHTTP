@@ -71,6 +71,14 @@ class ConnectionTest {
 			InetSocketAddress nextHop = request.getNextHopAddress();
 			request.response.send(request.getIPAddress() + " " + nextHop.getAddress().getHostAddress() + " " + nextHop.getPort());
 		});
+		server.getResponderRegistry(null).register("/read-all", request -> {
+			byte[] body = request.getInputStream().readAllBytes();
+			long sum = 0;
+			for (byte b : body) {
+				sum += b & 0xff;
+			}
+			request.response.send(body.length + " " + sum);
+		});
 		server.getResponderRegistry(null).register("/error", request -> {
 			throw new IOException("the application's own error");
 		});
@@ -298,6 +306,60 @@ class ConnectionTest {
 	void http09RequestGetsPlainTextAndClose() throws IOException {
 		String response = sendAndReadUntilClosed("GET /\r\n");
 		assertTrue(response.startsWith("Please send a full HTTP request."), response);
+	}
+
+	private String postAndReadAll(byte[] head, byte[] body) throws IOException {
+		try (Socket socket = new Socket("127.0.0.1", serverSocket.getLocalPort())) {
+			socket.setSoTimeout(5000);
+			socket.getOutputStream().write(head);
+			socket.getOutputStream().write(body);
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			byte[] buffer = new byte[4096];
+			int c;
+			while ((c = socket.getInputStream().read(buffer)) != -1) {
+				out.write(buffer, 0, c);
+			}
+			String response = new String(out.toByteArray(), StandardCharsets.UTF_8);
+			return response.substring(response.indexOf("\r\n\r\n") + 4);
+		}
+	}
+
+	private static byte[] largeBody() {
+		byte[] body = new byte[70000];
+		for (int i = 0; i < body.length; i++) {
+			body[i] = (byte) (i * 7);
+		}
+		return body;
+	}
+
+	private static String lengthAndSum(byte[] body) {
+		long sum = 0;
+		for (byte b : body) {
+			sum += b & 0xff;
+		}
+		return body.length + " " + sum;
+	}
+
+	@Test
+	void readAllBytesReadsALargeBody() throws IOException {
+		byte[] body = largeBody();
+		String head = "POST /read-all HTTP/1.1\r\nHost: x\r\nContent-Type: application/octet-stream\r\nContent-Length: " + body.length + "\r\nConnection: close\r\n\r\n";
+		assertEquals(lengthAndSum(body), postAndReadAll(head.getBytes(StandardCharsets.UTF_8), body));
+	}
+
+	@Test
+	void readAllBytesReadsALargeChunkedBody() throws IOException {
+		byte[] body = largeBody();
+		ByteArrayOutputStream chunked = new ByteArrayOutputStream();
+		for (int off = 0; off < body.length; off += 10000) {
+			int len = Math.min(10000, body.length - off);
+			chunked.write((Integer.toHexString(len) + "\r\n").getBytes(StandardCharsets.UTF_8));
+			chunked.write(body, off, len);
+			chunked.write("\r\n".getBytes(StandardCharsets.UTF_8));
+		}
+		chunked.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+		String head = "POST /read-all HTTP/1.1\r\nHost: x\r\nContent-Type: application/octet-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+		assertEquals(lengthAndSum(body), postAndReadAll(head.getBytes(StandardCharsets.UTF_8), chunked.toByteArray()));
 	}
 
 	@Test
