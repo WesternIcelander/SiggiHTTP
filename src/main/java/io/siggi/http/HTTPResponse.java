@@ -28,6 +28,7 @@ public class HTTPResponse extends OutputStream {
 
 	private void throwIOIfClosed() throws IOException {
 		if (closed) throw new IOException("Already closed");
+		if (request.handler.isAborted()) throw new IOException("Response aborted");
 	}
 
 	private void throwIllegalIfClosed() {
@@ -494,10 +495,33 @@ public class HTTPResponse extends OutputStream {
 	@Override
 	public void close() throws IOException {
 		if (closed) return;
+		if (request.handler.isAborted()) {
+			markClosed();
+			request.handler.closeAbortedRequest();
+			return;
+		}
 		if (!alreadyWrote()) sendHeaders();
 		request.handler.makeCleanupExplicit();
 		markClosed();
 		request.handler.closeRequest();
+	}
+
+	/**
+	 * Ends the connection at once, for example to drop a client that stopped
+	 * reading a stream. The socket is closed with a reset, without flushing
+	 * or sending the rest of the response.
+	 * <p>
+	 * This can be called from any thread, including while another thread is
+	 * blocked writing to this response, and it never blocks. A write or flush
+	 * in progress throws an {@link IOException}, and so does any later one.
+	 * The server treats that like the client going away and doesn't log it.
+	 * It works before or after the headers are sent, and whether or not
+	 * {@link HTTPRequest#openResponse()} was called. If it was, still call
+	 * {@link #close()} afterwards to release the request's resources; it
+	 * won't write anything.
+	 */
+	public void abort() {
+		request.handler.abort();
 	}
 
 	void markClosed() {

@@ -479,9 +479,10 @@ final class HTTPHandler {
 					}
 					keepAlive = false;
 				} catch (Exception e) {
-					if (clientOut.hasFailed()) {
+					if (clientOut.hasFailed() || aborted) {
 						// Writing to the client failed, so it has gone away, for example a viewer
-						// leaving a stream. That's not a server error, so end the connection quietly.
+						// leaving a stream, or the application aborted the response. That's not a
+						// server error, so end the connection quietly.
 						cannotKeepAlive = true;
 						keepAlive = false;
 						continue;
@@ -578,6 +579,54 @@ final class HTTPHandler {
 
 	void makeCleanupExplicit() {
 		cleanupIsExplicit = true;
+	}
+
+	private volatile boolean aborted = false;
+
+	boolean isAborted() {
+		return aborted;
+	}
+
+	/**
+	 * Ends the connection at once with a reset, without flushing, so a write
+	 * blocked on a client that stopped reading fails straight away. Safe to
+	 * call from any thread, and never blocks.
+	 */
+	void abort() {
+		aborted = true;
+		try {
+			// Send a reset rather than waiting to deliver unsent data
+			sock.setSoLinger(true, 0);
+		} catch (Exception ignored) {
+		}
+		if (sock instanceof SSLSocket) {
+			// Closing a TLS socket may wait for a lock held by the blocked
+			// writer, so close it on another thread
+			Thread closer = new Thread(this::closeSocketQuietly, "SiggiHTTP abort");
+			closer.setDaemon(true);
+			closer.start();
+		} else {
+			closeSocketQuietly();
+		}
+	}
+
+	private void closeSocketQuietly() {
+		try {
+			sock.close();
+		} catch (Exception ignored) {
+		}
+	}
+
+	/**
+	 * Releases the request's resources after {@link #abort()}, without
+	 * writing anything to the closed connection.
+	 */
+	void closeAbortedRequest() {
+		cleanupIsExplicit = true;
+		postRequestCleanup();
+		if (Thread.currentThread() == handlerThread) {
+			cleanedUpOnHandlerThread = true;
+		}
 	}
 
 	void closeRequest() throws IOException {
