@@ -798,7 +798,7 @@ final class HTTPHandler {
 				String key = entry.getKey();
 				for (String val : entry.getValue()) {
 					if (key.equalsIgnoreCase("X-Forwarded-For")) { // Loopback gateway
-						if (realInetAddress.isLoopbackAddress() || CloudFlare.isCloudFlare(realInetAddress) || server.isIPTrusted(realInetAddress.getHostAddress())) {
+						if (isNextHopTrustedProxy()) {
 							String[] forwardedFor = val.split(",");
 							for (int i = 0; i < forwardedFor.length; i++) {
 								forwardedFor[i] = forwardedFor[i].trim();
@@ -1349,6 +1349,15 @@ final class HTTPHandler {
 
 	boolean isSocketSecure() {
 		return (sock instanceof SSLSocket);
+	}
+
+	/**
+	 * Whether the socket peer may set the forwarding headers that describe
+	 * the client (X-Forwarded-For and X-Forwarded-Proto): loopback, a
+	 * Cloudflare address, or a trusted IP.
+	 */
+	boolean isNextHopTrustedProxy() {
+		return realInetAddress.isLoopbackAddress() || CloudFlare.isCloudFlare(realInetAddress) || server.isIPTrusted(realInetAddress.getHostAddress());
 	}
 
 	final HTTPServer server;
