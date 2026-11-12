@@ -21,6 +21,10 @@ public class SecureBufferedInputStream extends InputStream {
 		if (in == null) {
 			throw new NullPointerException();
 		}
+		if (bufferSize <= 0) {
+			// a zero-length buffer could never grow by doubling
+			throw new IllegalArgumentException("Buffer size must be positive: " + bufferSize);
+		}
 		this.in = in;
 		this.buffer = new byte[bufferSize];
 	}
@@ -69,8 +73,8 @@ public class SecureBufferedInputStream extends InputStream {
 			} else if (buffer.length >= maxBufferSize) {
 				throw new OutOfMemoryError("Required array size too large");
 			} else {
-				int chk = maxBufferSize - (buffer.length * 2);
-				int newSize = chk < 0 ? maxBufferSize : chk;
+				// double the buffer, without going over the maximum
+				int newSize = buffer.length > maxBufferSize / 2 ? maxBufferSize : buffer.length * 2;
 				byte[] newBuffer = new byte[newSize];
 				System.arraycopy(buffer, 0, newBuffer, 0, buffer.length);
 				// erase the old buffer
