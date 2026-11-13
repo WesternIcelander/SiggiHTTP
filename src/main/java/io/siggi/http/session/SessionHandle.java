@@ -16,7 +16,7 @@ import java.util.Map;
  * then. A read-only handle holds a copy of the session's values and no lock,
  * so it doesn't need closing.
  */
-@SuppressWarnings("deprecation")
+@SuppressWarnings({"deprecation", "removal"}) // wraps Session, which will become package-private
 public final class SessionHandle implements AutoCloseable {
 
 	private final Sessions sessions;

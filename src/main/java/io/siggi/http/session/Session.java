@@ -11,6 +11,14 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * A session's values.
+ *
+ * @deprecated Use {@link Sessions#openSession}, {@link Sessions#readSession}
+ * and {@link Sessions#resetSession}, which return a {@link SessionHandle}.
+ * This class will become package-private.
+ */
+@Deprecated(since = "1.11", forRemoval = true)
 public final class Session {
 
 	private final Map<String, String> values = new HashMap<>();

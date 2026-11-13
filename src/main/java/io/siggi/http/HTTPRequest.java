@@ -201,6 +201,7 @@ public class HTTPRequest {
 		return handler.sourceSocket;
 	}
 
+	@SuppressWarnings("removal")
 	Session session;
 
 	/**
@@ -300,7 +301,7 @@ public class HTTPRequest {
 		return handler.isSocketSecure();
 	}
 
-	@SuppressWarnings("deprecation")
+	@SuppressWarnings({"deprecation", "removal"})
 	void saveSession() {
 		if (session != null) {
 			session.save();

@@ -8,6 +8,7 @@ import java.security.SecureRandom;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@SuppressWarnings("removal") // uses Session, which will become package-private
 public abstract class Sessions {
 
 	final long expireTime;
@@ -319,6 +320,14 @@ public abstract class Sessions {
 
 	public abstract boolean sessionExists(String sessionId);
 
+	/**
+	 * Creates a new session.
+	 *
+	 * @return the new session
+	 * @deprecated Use {@link #openSession(HTTPRequest)} or
+	 * {@link #resetSession(HTTPRequest)}, which also set the session cookie.
+	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public abstract Session newSession();
 
 	/**
@@ -329,9 +338,21 @@ public abstract class Sessions {
 	 * Unknown, expired and deleted IDs return null rather than creating a
 	 * session, so a client can't choose its own session ID. Use
 	 * {@link #newSession()} to start a session.
+	 * @deprecated Use {@link #openSession(HTTPRequest)} or
+	 * {@link #readSession(HTTPRequest)}, which find the session from the
+	 * request's cookie.
 	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public abstract Session get(String sessionId);
 
+	/**
+	 * Returns whether a session has expired.
+	 *
+	 * @param session the session
+	 * @return true if it's null or has expired
+	 * @deprecated {@link Session} will become package-private.
+	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public final boolean hasExpired(Session session) {
 		if (session == null) {
 			return true;

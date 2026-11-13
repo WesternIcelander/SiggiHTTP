@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+@SuppressWarnings("removal") // uses Session, which will become package-private
 final class SessionsDisk extends Sessions {
 
 	SessionsDisk(SessionsBuilder builder) {
