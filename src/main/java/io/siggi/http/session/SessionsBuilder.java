@@ -17,6 +17,7 @@ public final class SessionsBuilder {
 	File directory = null;
 	String cookieName = "SessID";
 	SameSite sameSite = SameSite.LAX;
+	long cookieMaxAge = -1L;
 	// set only by the deprecated Sessions.create() methods
 	boolean legacy = false;
 
@@ -72,6 +73,25 @@ public final class SessionsBuilder {
 	 */
 	public SessionsBuilder setSameSite(SameSite sameSite) {
 		this.sameSite = sameSite;
+		return this;
+	}
+
+	/**
+	 * Makes the session cookie last this long in the browser. By default it
+	 * has no Max-Age, so the browser forgets it when it's closed. With a
+	 * Max-Age, the cookie is sent again each time {@link Sessions#openSession}
+	 * or {@link Sessions#readSession} is called before the response headers
+	 * are sent, so it lasts this long after the last use. It usually makes
+	 * sense to match the expire time.
+	 *
+	 * @param seconds the Max-Age in seconds, or a negative number for none
+	 * @return this builder
+	 */
+	public SessionsBuilder setCookieMaxAge(long seconds) {
+		if (seconds == 0L) {
+			throw new IllegalArgumentException("A Max-Age of 0 would delete the cookie straight away");
+		}
+		this.cookieMaxAge = seconds < 0L ? -1L : seconds;
 		return this;
 	}
 

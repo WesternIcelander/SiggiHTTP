@@ -392,4 +392,25 @@ class SessionsApiTest {
 		assertEquals("false null null", parts[1] + " " + parts[2] + " " + parts[3]);
 		assertFalse(sessions.sessionExists(oldId));
 	}
+
+	@Test
+	void maxAgeIsSetAndRefreshedOnEachUse() throws IOException {
+		start(new SessionsBuilder().setCookieMaxAge(86400L).build(), null);
+		Response created = get("/open", null);
+		String id = idOf(created);
+		String expected = "SessID=" + id + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400";
+		assertEquals(java.util.Collections.singletonList(expected), created.setCookies);
+		assertEquals(java.util.Collections.singletonList(expected), get("/open", "SessID=" + id).setCookies);
+		assertEquals(java.util.Collections.singletonList(expected), get("/read", "SessID=" + id).setCookies);
+		// no session, so nothing to refresh
+		assertTrue(get("/read", null).setCookies.isEmpty());
+	}
+
+	@Test
+	void withoutMaxAgeAnExistingSessionIsNotResent() throws IOException {
+		start(newSessions(), null);
+		String id = idOf(get("/open", null));
+		assertTrue(get("/open", "SessID=" + id).setCookies.isEmpty());
+		assertTrue(get("/read", "SessID=" + id).setCookies.isEmpty());
+	}
 }

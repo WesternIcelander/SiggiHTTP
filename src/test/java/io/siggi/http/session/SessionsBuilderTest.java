@@ -21,6 +21,7 @@ class SessionsBuilderTest {
 		assertEquals("SessID", sessions.getCookieName());
 		assertEquals(SameSite.LAX, sessions.getSameSite());
 		assertFalse(sessions.legacy);
+		assertEquals(-1L, sessions.getCookieMaxAge());
 	}
 
 	@Test
@@ -31,12 +32,14 @@ class SessionsBuilderTest {
 				.setDirectory(directory)
 				.setCookieName("App_Session")
 				.setSameSite(null)
+				.setCookieMaxAge(600L)
 				.build();
 		assertTrue(sessions instanceof SessionsDisk);
 		assertTrue(directory.isDirectory());
 		assertEquals(5000L, sessions.getExpireTime());
 		assertEquals("App_Session", sessions.getCookieName());
 		assertNull(sessions.getSameSite());
+		assertEquals(600L, sessions.getCookieMaxAge());
 	}
 
 	@Test
@@ -53,5 +56,6 @@ class SessionsBuilderTest {
 		assertThrows(IllegalArgumentException.class, () -> new SessionsBuilder().setCookieName("a=b"));
 		assertThrows(IllegalArgumentException.class, () -> new SessionsBuilder().setCookieName(""));
 		assertThrows(IllegalArgumentException.class, () -> new SessionsBuilder().setCookieName(null));
+		assertThrows(IllegalArgumentException.class, () -> new SessionsBuilder().setCookieMaxAge(0L));
 	}
 }

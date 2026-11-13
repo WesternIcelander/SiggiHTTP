@@ -13,6 +13,7 @@ public abstract class Sessions {
 	final long expireTime;
 	final String cookieName;
 	final SameSite sameSite;
+	final long cookieMaxAge;
 	/**
 	 * Made with the deprecated create() methods: the session cookie keeps
 	 * the old format, and its name comes from the HTTPServer.
@@ -23,6 +24,7 @@ public abstract class Sessions {
 		this.expireTime = builder.expireTime;
 		this.cookieName = builder.cookieName;
 		this.sameSite = builder.sameSite;
+		this.cookieMaxAge = builder.cookieMaxAge;
 		this.legacy = builder.legacy;
 	}
 
@@ -55,6 +57,15 @@ public abstract class Sessions {
 	 */
 	public SameSite getSameSite() {
 		return sameSite;
+	}
+
+	/**
+	 * Returns the Max-Age of the session cookie.
+	 *
+	 * @return the Max-Age in seconds, or -1 if the cookie has none
+	 */
+	public long getCookieMaxAge() {
+		return cookieMaxAge;
 	}
 
 	/**
@@ -94,7 +105,9 @@ public abstract class Sessions {
 			if (session == null) {
 				checkCanSetCookie(request);
 				session = newSession();
-				setCookie(request, session.getSessionId(), -1L);
+				setCookie(request, session.getSessionId(), cookieMaxAge);
+			} else {
+				refreshCookie(request, session);
 			}
 			session.exclusive.acquireUninterruptibly();
 			if (session.isDeleted()) {
@@ -138,6 +151,7 @@ public abstract class Sessions {
 			}
 			// records the new last use, at most once a minute when unchanged
 			session.save();
+			refreshCookie(request, session);
 			return new SessionHandle(this, request, session, false);
 		} finally {
 			session.exclusive.release();
@@ -178,7 +192,7 @@ public abstract class Sessions {
 		checkCanSetCookie(request);
 		deleteCurrent(request);
 		Session session = newSession();
-		setCookie(request, session.getSessionId(), -1L);
+		setCookie(request, session.getSessionId(), cookieMaxAge);
 		session.exclusive.acquireUninterruptibly();
 		SessionHandle handle = new SessionHandle(this, request, session, true);
 		openHandles.put(request, handle);
@@ -226,6 +240,17 @@ public abstract class Sessions {
 
 	private String cookieName(HTTPRequest request) {
 		return legacy ? request.server.getSessionCookieName() : cookieName;
+	}
+
+	/**
+	 * Sends the cookie for an existing session again if it has a Max-Age, so
+	 * it lasts that long from now. Skipped if the headers were already sent.
+	 */
+	@SuppressWarnings("deprecation")
+	private void refreshCookie(HTTPRequest request, Session session) {
+		if (cookieMaxAge > 0L && !request.alreadyWrote()) {
+			setCookie(request, session.getSessionId(), cookieMaxAge);
+		}
 	}
 
 	private static void checkCanSetCookie(HTTPRequest request) {
