@@ -331,6 +331,21 @@ public class HTTPRequest {
 	}
 
 	/**
+	 * Runs a task when this request ends: after the responder returns, or
+	 * after {@link HTTPResponse#close()} if {@link #openResponse()} was called.
+	 * Tasks run in the order they were added, on whichever thread ends the
+	 * request. An exception from one is logged, and the others still run.
+	 *
+	 * @param task the task to run
+	 */
+	public void addCleanupTask(Runnable task) {
+		if (task == null) {
+			throw new NullPointerException("task");
+		}
+		handler.addCleanupTask(task);
+	}
+
+	/**
 	 * Return the HTTP response associated with this request and requires it to be explicitly closed. This means you can
 	 * return from the {@link HTTPResponder#respond(HTTPRequest)} method before the request is complete and hand off the
 	 * request to a different thread. Take care to eventually close the response and not leave it dangling if your

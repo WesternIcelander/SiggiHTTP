@@ -648,10 +648,29 @@ final class HTTPHandler {
 
 	private void postRequestCleanup() {
 		purgeTmpFiles();
-		for (Runnable runnable : cleanupTasks) {
-			runnable.run();
+		while (true) {
+			Runnable task;
+			synchronized (cleanupTasks) {
+				if (cleanupTasks.isEmpty()) {
+					break;
+				}
+				task = cleanupTasks.remove(0);
+			}
+			try {
+				task.run();
+			} catch (Exception e) {
+				// one failing task mustn't stop the rest from running
+				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+				e.printStackTrace(new PrintStream(baos, true));
+				System.err.print("SiggiHTTP: a request cleanup task failed: " + new String(baos.toByteArray()));
+			}
 		}
-		cleanupTasks.clear();
+	}
+
+	void addCleanupTask(Runnable task) {
+		synchronized (cleanupTasks) {
+			cleanupTasks.add(task);
+		}
 	}
 
 	/**
