@@ -1,5 +1,6 @@
 package io.siggi.http;
 
+import io.siggi.http.cookie.CookieBakery;
 import io.siggi.http.exception.EndResponse;
 import io.siggi.http.session.Session;
 import io.siggi.http.session.Sessions;
@@ -226,7 +227,7 @@ public class HTTPRequest {
 				session = sessions.newSession();
 				sessionId = session.getSessionId();
 			}
-			response.addHeader("Set-Cookie", sessionCookieName + "=" + sessionId + "; path=/; HttpOnly;" + (isSecure() ? " Secure;" : ""));
+			response.addHeader("Set-Cookie", CookieBakery.name(sessionCookieName).value(sessionId).httpOnly(true).secure(isSecure()).bake());
 		}
 		return session;
 	}
@@ -278,7 +279,7 @@ public class HTTPRequest {
 		String sessionCookieName = handler.server.getSessionCookieName();
 		Sessions sessions = handler.server.getSessions();
 		session = sessions.newSession();
-		response.addHeader("Set-Cookie", sessionCookieName + "=" + session.getSessionId() + "; path=/; HttpOnly;" + (isSecure() ? " Secure;" : ""));
+		response.addHeader("Set-Cookie", CookieBakery.name(sessionCookieName).value(session.getSessionId()).httpOnly(true).secure(isSecure()).bake());
 		return session;
 	}
 

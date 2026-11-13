@@ -109,7 +109,7 @@ class SessionRequestTest {
 	void getSessionReplacesUnknownIdWithRandomOne() throws IOException {
 		Response response = get("/session", CLIENT_CHOSEN_ID);
 		assertNotEquals(CLIENT_CHOSEN_ID, response.body);
-		assertTrue(response.setCookie.startsWith("SessID=" + response.body + ";"), response.setCookie);
+		assertEquals("SessID=" + response.body + "; Path=/; HttpOnly", response.setCookie);
 		assertFalse(sessions.sessionExists(CLIENT_CHOSEN_ID));
 	}
 
@@ -123,7 +123,7 @@ class SessionRequestTest {
 	void resetSessionWithoutASessionSetsOneCookie() throws IOException {
 		Response response = get("/reset", null);
 		assertEquals(1, response.setCookieCount);
-		assertTrue(response.setCookie.startsWith("SessID=" + response.body + ";"), response.setCookie);
+		assertEquals("SessID=" + response.body + "; Path=/; HttpOnly", response.setCookie);
 	}
 
 	@Test
