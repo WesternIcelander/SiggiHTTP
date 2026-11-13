@@ -262,6 +262,7 @@ public abstract class Sessions {
 		return sessionId == null ? null : get(sessionId);
 	}
 
+	@SuppressWarnings("removal")
 	private String cookieName(HTTPRequest request) {
 		return legacy ? request.server().getSessionCookieName() : cookieName;
 	}

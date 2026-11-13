@@ -482,7 +482,9 @@ public final class HTTPServer {
 	 * Get the Sessions object for this HTTPServer.
 	 *
 	 * @return the sessions object
+	 * @deprecated The server will no longer hold the Sessions. Sessions are now used directly: build one with {@link io.siggi.http.session.SessionsBuilder}, which also sets the cookie name, keep it in your application, and call its methods with the request.
 	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public Sessions getSessions() {
 		return sessions;
 	}
@@ -491,7 +493,9 @@ public final class HTTPServer {
 	 * Set the Sessions object for this HTTPServer.
 	 *
 	 * @param sessions
+	 * @deprecated The server will no longer hold the Sessions. Sessions are now used directly: build one with {@link io.siggi.http.session.SessionsBuilder}, which also sets the cookie name, keep it in your application, and call its methods with the request.
 	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public void setSessions(Sessions sessions) {
 		if (startedProcessing) {
 			throw new IllegalStateException("Sessions cannot be changed after starting.");
@@ -501,6 +505,16 @@ public final class HTTPServer {
 
 	private String sessionCookieName = "SessID";
 
+	/**
+	 * Returns the name of the session cookie used by
+	 * {@link HTTPRequest#getSession()} and by Sessions made with the
+	 * deprecated {@code Sessions.create()} methods.
+	 *
+	 * @return the cookie name
+	 * @deprecated The cookie name is now set on the Sessions, with
+	 * {@link io.siggi.http.session.SessionsBuilder#setCookieName(String)}.
+	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public String getSessionCookieName() {
 		return sessionCookieName;
 	}

@@ -207,7 +207,11 @@ public class HTTPRequest {
 	 * Get the current session.
 	 *
 	 * @return the session
+	 * @deprecated Use {@link Sessions#openSession(HTTPRequest)} for a session
+	 * to write to, or {@link Sessions#readSession(HTTPRequest)} to read one.
 	 */
+	@Deprecated(since = "1.11", forRemoval = true)
+	@SuppressWarnings("removal")
 	public Session getSession() {
 		if (session == null || session.isDeleted()) {
 			String sessionCookieName = handler.server.getSessionCookieName();
@@ -230,8 +234,12 @@ public class HTTPRequest {
 	 * Get the current session if there does exist one for this connection, but
 	 * does not create one if it doesn't exist.
 	 *
-	 * @return
+	 * @return the session, or null if there isn't one
+	 * @deprecated Use {@link Sessions#readSession(HTTPRequest)}, which never
+	 * creates a session either.
 	 */
+	@Deprecated(since = "1.11", forRemoval = true)
+	@SuppressWarnings("removal")
 	public Session getSessionIfExists() {
 		if (session == null || session.isDeleted()) {
 			String sessionCookieName = handler.server.getSessionCookieName();
@@ -252,7 +260,10 @@ public class HTTPRequest {
 	 * reasons, such as if a login state is changed.
 	 *
 	 * @return a new session
+	 * @deprecated Use {@link Sessions#resetSession(HTTPRequest)}.
 	 */
+	@Deprecated(since = "1.11", forRemoval = true)
+	@SuppressWarnings("removal")
 	public Session resetSession() {
 		if (handler.wrote) {
 			throw new IllegalStateException("Headers already sent, cannot modify for session cookie!");
