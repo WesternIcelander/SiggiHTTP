@@ -1,6 +1,7 @@
 package io.siggi.http.session;
 
 import io.siggi.http.HTTPRequest;
+import io.siggi.http.cookie.CookieBakery;
 import io.siggi.http.cookie.SameSite;
 import java.io.CharArrayReader;
 import java.io.File;
@@ -198,7 +199,7 @@ public abstract class Sessions {
 	public void deleteSession(HTTPRequest request) {
 		deleteCurrent(request);
 		if (request.cookies().containsKey(cookieName(request)) && !request.alreadyWrote()) {
-			setCookie(request, "", 0L);
+			request.response.addHeader("Set-Cookie", cookie(request).delete());
 		}
 	}
 
@@ -287,36 +288,25 @@ public abstract class Sessions {
 	}
 
 	/**
+	 * Starts the session cookie with this request's name and attributes.
+	 * Sessions from the deprecated create() methods have no SameSite, as
+	 * before.
+	 */
+	private CookieBakery cookie(HTTPRequest request) {
+		return CookieBakery.name(cookieName(request))
+				.httpOnly(true)
+				.secure(request.isSecure())
+				.sameSite(legacy ? null : sameSite);
+	}
+
+	/**
 	 * Sets the session cookie.
 	 *
 	 * @param maxAge the Max-Age in seconds, or -1 to leave it out
 	 */
 	private void setCookie(HTTPRequest request, String sessionId, long maxAge) {
 		checkCanSetCookie(request);
-		StringBuilder cookie = new StringBuilder();
-		cookie.append(cookieName(request)).append('=').append(sessionId);
-		if (legacy) {
-			// the format HTTPRequest.getSession() has always used
-			cookie.append("; path=/; HttpOnly;");
-			if (request.isSecure()) {
-				cookie.append(" Secure;");
-			}
-			if (maxAge >= 0L) {
-				cookie.append(" Max-Age=").append(maxAge).append(';');
-			}
-		} else {
-			cookie.append("; Path=/; HttpOnly");
-			if (request.isSecure()) {
-				cookie.append("; Secure");
-			}
-			if (sameSite != null) {
-				cookie.append("; SameSite=").append(sameSite.getValue());
-			}
-			if (maxAge >= 0L) {
-				cookie.append("; Max-Age=").append(maxAge);
-			}
-		}
-		request.response.addHeader("Set-Cookie", cookie.toString());
+		request.response.addHeader("Set-Cookie", cookie(request).value(sessionId).maxAge(maxAge).bake());
 	}
 
 	public abstract boolean sessionExists(String sessionId);

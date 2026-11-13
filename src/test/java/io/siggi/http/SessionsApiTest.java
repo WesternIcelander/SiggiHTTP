@@ -331,7 +331,8 @@ class SessionsApiTest {
 		start(Sessions.create(3600000L), "Legacy");
 		Response response = get("/open?set=a", null);
 		String id = idOf(response);
-		assertEquals("Legacy=" + id + "; path=/; HttpOnly;", response.setCookies.get(0));
+		// no SameSite, as before
+		assertEquals("Legacy=" + id + "; Path=/; HttpOnly", response.setCookies.get(0));
 		assertNotNull(sessions.get(id));
 		assertEquals(id + " a", get("/open", "Legacy=" + id).body);
 	}
