@@ -9,8 +9,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 final class SessionsMemory extends Sessions {
 
-	SessionsMemory(long expireTime) {
-		super(expireTime);
+	SessionsMemory(SessionsBuilder builder) {
+		super(builder);
 	}
 
 	private final Map<String, Session> sessions = new HashMap<>();

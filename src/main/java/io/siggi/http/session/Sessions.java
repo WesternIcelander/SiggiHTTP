@@ -9,9 +9,19 @@ import java.util.Map;
 public abstract class Sessions {
 
 	final long expireTime;
+	final String cookieName;
+	final SameSite sameSite;
+	/**
+	 * Made with the deprecated create() methods: the session cookie keeps
+	 * the old format, and its name comes from the HTTPServer.
+	 */
+	final boolean legacy;
 
-	Sessions(long expireTime) {
-		this.expireTime = expireTime;
+	Sessions(SessionsBuilder builder) {
+		this.expireTime = builder.expireTime;
+		this.cookieName = builder.cookieName;
+		this.sameSite = builder.sameSite;
+		this.legacy = builder.legacy;
 	}
 
 	public static Sessions create(long expireTime) {
@@ -19,11 +29,39 @@ public abstract class Sessions {
 	}
 
 	public static Sessions create(long expireTime, File directory) {
-		if (directory == null) {
-			return new SessionsMemory(expireTime);
-		} else {
-			return new SessionsDisk(expireTime, directory);
-		}
+		SessionsBuilder builder = new SessionsBuilder();
+		// The old methods didn't check the expire time, so don't start now
+		builder.expireTime = expireTime;
+		builder.directory = directory;
+		builder.legacy = true;
+		return builder.build();
+	}
+
+	/**
+	 * Returns the name of the session cookie.
+	 *
+	 * @return the cookie name
+	 */
+	public String getCookieName() {
+		return cookieName;
+	}
+
+	/**
+	 * Returns the SameSite attribute of the session cookie.
+	 *
+	 * @return the SameSite value, or null if the attribute is left out
+	 */
+	public SameSite getSameSite() {
+		return sameSite;
+	}
+
+	/**
+	 * Returns how long a session lasts without being used.
+	 *
+	 * @return the time in milliseconds
+	 */
+	public long getExpireTime() {
+		return expireTime;
 	}
 
 	public abstract boolean sessionExists(String sessionId);

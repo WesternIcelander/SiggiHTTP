@@ -22,9 +22,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 final class SessionsDisk extends Sessions {
 
-	SessionsDisk(long expireTime, File directory) {
-		super(expireTime);
-		this.directory = directory;
+	SessionsDisk(SessionsBuilder builder) {
+		super(builder);
+		this.directory = builder.directory;
 		if (!directory.exists()) {
 			directory.mkdirs();
 		}
