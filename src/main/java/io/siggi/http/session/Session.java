@@ -7,6 +7,7 @@ import java.io.Writer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -30,6 +31,10 @@ public final class Session {
 	static final long SAVE_LAST_USE_INTERVAL = 60000L;
 
 	private boolean changed = false;
+
+	// held by a writable SessionHandle; not a ReentrantLock, because a
+	// response handed to another thread may close its handle from there
+	final Semaphore exclusive = new Semaphore(1);
 
 	Session(Sessions sessions, String sessionId) {
 		this.sessions = sessions;
