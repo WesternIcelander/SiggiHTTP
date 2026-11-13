@@ -1,6 +1,7 @@
 package io.siggi.http.session;
 
 import io.siggi.http.HTTPRequest;
+import io.siggi.http.cookie.SameSite;
 import java.io.CharArrayReader;
 import java.io.File;
 import java.io.IOException;

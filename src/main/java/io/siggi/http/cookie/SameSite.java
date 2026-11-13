@@ -1,4 +1,4 @@
-package io.siggi.http.session;
+package io.siggi.http.cookie;
 
 /**
  * The SameSite attribute of the session cookie, which controls whether
