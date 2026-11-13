@@ -5,9 +5,11 @@ import io.siggi.http.util.Util;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -119,6 +121,7 @@ final class SessionsDisk extends Sessions {
 			if (hasExpired(session.lastUse)) {
 				break readLock;
 			}
+			session.lastUse = System.currentTimeMillis();
 			return session;
 		} finally {
 			readLock.unlock();
@@ -142,6 +145,7 @@ final class SessionsDisk extends Sessions {
 					if (hasExpired(session.lastUse)) {
 						break existCheck;
 					}
+					session.lastUse = System.currentTimeMillis();
 					return session;
 				}
 				fileCheck:
@@ -155,7 +159,7 @@ final class SessionsDisk extends Sessions {
 						f.delete();
 						break existCheck;
 					}
-					try (BufferedReader reader = new BufferedReader(new FileReader(f))) {
+					try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
 						Session session = new Session(this, sessionId);
 						session.load(reader);
 						sessions.put(sessionId, new WeakReference<>(session));
@@ -177,9 +181,10 @@ final class SessionsDisk extends Sessions {
 		readLock.lock();
 		try {
 			File sessionFile = getSessionFile(session.sessionId);
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(sessionFile))) {
+			try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(sessionFile), StandardCharsets.UTF_8))) {
 				session.save(writer);
 			} catch (IOException ioe) {
+				System.err.println("SiggiHTTP: couldn't save session to " + sessionFile + ": " + ioe);
 			}
 		} finally {
 			readLock.unlock();
@@ -235,7 +240,7 @@ final class SessionsDisk extends Sessions {
 	}
 
 	private long readLastUse(File f) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(f))) {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
 			return Long.parseLong(reader.readLine());
 		} catch (IOException | NumberFormatException e) {
 		}

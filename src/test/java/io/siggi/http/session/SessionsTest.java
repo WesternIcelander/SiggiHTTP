@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -78,5 +79,68 @@ class SessionsTest {
 		File directory = dir.toFile();
 		assertDeletedSessionIsNotRecreated(Sessions.create(LIFETIME, directory));
 		assertEquals(0, directory.list().length);
+	}
+
+	private static int fileCount(File directory) {
+		String[] names = directory.list();
+		return names == null ? 0 : names.length;
+	}
+
+	private static void deleteFiles(File directory) {
+		for (File f : directory.listFiles()) {
+			assertTrue(f.delete());
+		}
+	}
+
+	@Test
+	@SuppressWarnings("deprecation")
+	void diskUnchangedSessionIsNotRewritten(@TempDir Path dir) {
+		File directory = dir.toFile();
+		Session session = Sessions.create(LIFETIME, directory).newSession();
+		session.set("user", "siggi");
+		session.save();
+		assertEquals(1, fileCount(directory));
+		deleteFiles(directory);
+		session.save();
+		assertEquals(0, fileCount(directory));
+		session.set("user", "someone else");
+		session.save();
+		assertEquals(1, fileCount(directory));
+	}
+
+	@Test
+	@SuppressWarnings("deprecation")
+	void diskLastUseIsRewrittenAfterAMinute(@TempDir Path dir) {
+		File directory = dir.toFile();
+		Session session = Sessions.create(LIFETIME, directory).newSession();
+		session.save();
+		deleteFiles(directory);
+		session.savedLastUse -= Session.SAVE_LAST_USE_INTERVAL;
+		session.save();
+		assertEquals(1, fileCount(directory));
+	}
+
+	@Test
+	void diskCachedSessionLookupUpdatesLastUse(@TempDir Path dir) {
+		Sessions sessions = Sessions.create(LIFETIME, dir.toFile());
+		Session session = sessions.newSession();
+		long old = System.currentTimeMillis() - LIFETIME / 2;
+		session.lastUse = old;
+		// session is still strongly referenced, so this finds the cached copy
+		assertSame(session, sessions.get(session.getSessionId()));
+		assertTrue(session.lastUse > old + 1000, "lastUse wasn't updated");
+	}
+
+	@Test
+	@SuppressWarnings("deprecation")
+	void diskValuesAreStoredAsUtf8(@TempDir Path dir) throws Exception {
+		File directory = dir.toFile();
+		String value = "\u00fc \ud83d\ude00 a=b\\c\nd";
+		Session session = Sessions.create(LIFETIME, directory).newSession();
+		session.set("name", value);
+		session.save();
+		byte[] file = java.nio.file.Files.readAllBytes(directory.listFiles()[0].toPath());
+		assertTrue(new String(file, java.nio.charset.StandardCharsets.UTF_8).contains("\u00fc \ud83d\ude00"));
+		assertEquals(value, Sessions.create(LIFETIME, directory).get(session.getSessionId()).get("name"));
 	}
 }

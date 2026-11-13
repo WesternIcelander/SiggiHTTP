@@ -257,8 +257,12 @@ public class HTTPRequest {
 		if (handler.wrote) {
 			throw new IllegalStateException("Headers already sent, cannot modify for session cookie!");
 		}
-		Session oldSession = getSession();
-		oldSession.delete();
+		// Not getSession(), which would create a session and set a cookie
+		// only for both to be replaced here
+		Session oldSession = getSessionIfExists();
+		if (oldSession != null) {
+			oldSession.delete();
+		}
 		String sessionCookieName = handler.server.getSessionCookieName();
 		Sessions sessions = handler.server.getSessions();
 		session = sessions.newSession();

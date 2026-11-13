@@ -21,7 +21,13 @@ public final class Session {
 
 	private final Sessions sessions;
 	final String sessionId;
-	long lastUse;
+	// volatile: lookups update it while holding only a read lock
+	volatile long lastUse;
+	// the last use recorded in storage, so an unchanged session is only
+	// rewritten to record a new last use once per SAVE_LAST_USE_INTERVAL
+	long savedLastUse;
+
+	static final long SAVE_LAST_USE_INTERVAL = 60000L;
 
 	private boolean changed = false;
 
@@ -38,16 +44,16 @@ public final class Session {
 	 */
 	@Deprecated
 	public void save() {
-		readLock.lock();
+		writeLock.lock();
 		try {
 			if (deleted) {
 				return;
 			}
-			if (/*changed && */sessions.shouldSave()) {
+			if (sessions.shouldSave() && (changed || lastUse - savedLastUse >= SAVE_LAST_USE_INTERVAL)) {
 				sessions.save(this);
 			}
 		} finally {
-			readLock.unlock();
+			writeLock.unlock();
 		}
 	}
 
@@ -118,7 +124,7 @@ public final class Session {
 			if (l == null) {
 				return;
 			}
-			lastUse = Long.parseLong(l);
+			lastUse = savedLastUse = Long.parseLong(l);
 		} catch (NumberFormatException nfe) {
 			return;
 		}
@@ -131,7 +137,8 @@ public final class Session {
 	}
 
 	void save(Writer writer) throws IOException {
-		writer.write(Long.toString(lastUse) + "\n");
+		long lastUseNow = lastUse;
+		writer.write(Long.toString(lastUseNow) + "\n");
 		for (Map.Entry<String, String> entry : values.entrySet()) {
 			String write = Sessions.write(entry);
 			writer.write(write);
@@ -139,6 +146,7 @@ public final class Session {
 		}
 		writer.flush();
 		changed = false;
+		savedLastUse = lastUseNow;
 	}
 
 	/**

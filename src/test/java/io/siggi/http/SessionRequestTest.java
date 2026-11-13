@@ -35,6 +35,7 @@ class SessionRequestTest {
 			Session session = request.getSessionIfExists();
 			request.response.send(session == null ? "none" : session.getSessionId());
 		});
+		server.getResponderRegistry(null).register("/reset", request -> request.response.send(request.resetSession().getSessionId()));
 		server.getResponderRegistry(null).register("/session", request -> request.response.send(request.getSession().getSessionId()));
 		serverSocket = new ServerSocket(0);
 		Thread acceptor = new Thread(() -> {
@@ -56,6 +57,7 @@ class SessionRequestTest {
 
 	private static final class Response {
 		String setCookie;
+		int setCookieCount;
 		String body;
 	}
 
@@ -79,6 +81,7 @@ class SessionRequestTest {
 			for (String line : head.toString().split("\r\n")) {
 				if (line.regionMatches(true, 0, "Set-Cookie:", 0, 11)) {
 					response.setCookie = line.substring(11).trim();
+					response.setCookieCount++;
 				} else if (line.regionMatches(true, 0, "Content-Length:", 0, 15)) {
 					contentLength = Integer.parseInt(line.substring(15).trim());
 				}
@@ -114,5 +117,21 @@ class SessionRequestTest {
 	void getSessionKeepsExistingSession() throws IOException {
 		String id = sessions.newSession().getSessionId();
 		assertEquals(id, get("/session", id).body);
+	}
+
+	@Test
+	void resetSessionWithoutASessionSetsOneCookie() throws IOException {
+		Response response = get("/reset", null);
+		assertEquals(1, response.setCookieCount);
+		assertTrue(response.setCookie.startsWith("SessID=" + response.body + ";"), response.setCookie);
+	}
+
+	@Test
+	void resetSessionReplacesTheExistingSession() throws IOException {
+		String id = sessions.newSession().getSessionId();
+		Response response = get("/reset", id);
+		assertEquals(1, response.setCookieCount);
+		assertNotEquals(id, response.body);
+		assertFalse(sessions.sessionExists(id));
 	}
 }
