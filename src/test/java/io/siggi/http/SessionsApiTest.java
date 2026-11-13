@@ -116,6 +116,23 @@ class SessionsApiTest {
 				request.response.write("refused".getBytes(StandardCharsets.UTF_8));
 			}
 		});
+		register("/logout", request -> {
+			sessions.deleteSession(request);
+			request.response.send("logged out");
+		});
+		register("/login", request -> {
+			try (SessionHandle session = sessions.resetSession(request)) {
+				session.set("user", "siggi");
+				request.response.send(session.getSessionId() + " " + session.get("user"));
+			}
+		});
+		register("/login-while-open", request -> {
+			SessionHandle old = sessions.openSession(request);
+			old.set("value", "old");
+			try (SessionHandle session = sessions.resetSession(request)) {
+				request.response.send(session.getSessionId() + " " + old.isWritable() + " " + old.get("value") + " " + session.get("value"));
+			}
+		});
 		serverSocket = new ServerSocket(0);
 		Thread acceptor = new Thread(() -> {
 			while (!serverSocket.isClosed()) {
@@ -317,5 +334,62 @@ class SessionsApiTest {
 		assertEquals("Legacy=" + id + "; path=/; HttpOnly;", response.setCookies.get(0));
 		assertNotNull(sessions.get(id));
 		assertEquals(id + " a", get("/open", "Legacy=" + id).body);
+	}
+
+	@Test
+	void deleteSessionDeletesAndClearsTheCookie() throws IOException {
+		start(newSessions(), null);
+		String id = idOf(get("/open?set=a", null));
+		Response response = get("/logout", "SessID=" + id);
+		assertEquals("logged out", response.body);
+		assertEquals(java.util.Collections.singletonList("SessID=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"), response.setCookies);
+		assertFalse(sessions.sessionExists(id));
+		assertEquals("false null null", get("/read", "SessID=" + id).body);
+	}
+
+	@Test
+	void deleteSessionWithoutACookieSetsNoCookie() throws IOException {
+		start(newSessions(), null);
+		assertTrue(get("/logout", null).setCookies.isEmpty());
+	}
+
+	@Test
+	void deleteSessionWaitsForAWriter() throws Exception {
+		start(newSessions(), null);
+		String id = idOf(get("/open", null));
+		CompletableFuture<Response> writer = getAsync("/hold", "SessID=" + id);
+		assertTrue(held.await(5, TimeUnit.SECONDS));
+		CompletableFuture<Response> logout = getAsync("/logout", "SessID=" + id);
+		Thread.sleep(300L);
+		assertFalse(logout.isDone(), "delete didn't wait for the writer");
+		assertTrue(sessions.sessionExists(id));
+		release.countDown();
+		writer.get(5, TimeUnit.SECONDS);
+		logout.get(5, TimeUnit.SECONDS);
+		assertFalse(sessions.sessionExists(id));
+	}
+
+	@Test
+	void resetSessionReplacesTheSessionWithOneCookie() throws IOException {
+		start(newSessions(), null);
+		String oldId = idOf(get("/open?set=a", null));
+		Response response = get("/login", "SessID=" + oldId);
+		String newId = idOf(response);
+		assertFalse(newId.equals(oldId));
+		assertEquals(newId + " siggi", response.body);
+		assertEquals(java.util.Collections.singletonList("SessID=" + newId + "; Path=/; HttpOnly; SameSite=Lax"), response.setCookies);
+		assertFalse(sessions.sessionExists(oldId));
+		assertEquals("true " + newId + " null", get("/read", "SessID=" + newId).body);
+	}
+
+	@Test
+	void resetSessionEmptiesThisRequestsOldHandle() throws Exception {
+		start(newSessions(), null);
+		String oldId = idOf(get("/open", null));
+		Response response = getAsync("/login-while-open", "SessID=" + oldId).get(5, TimeUnit.SECONDS);
+		String[] parts = response.body.split(" ");
+		assertFalse(parts[0].equals(oldId));
+		assertEquals("false null null", parts[1] + " " + parts[2] + " " + parts[3]);
+		assertFalse(sessions.sessionExists(oldId));
 	}
 }

@@ -94,7 +94,7 @@ public abstract class Sessions {
 			if (session == null) {
 				checkCanSetCookie(request);
 				session = newSession();
-				setCookie(request, session.getSessionId());
+				setCookie(request, session.getSessionId(), -1L);
 			}
 			session.exclusive.acquireUninterruptibly();
 			if (session.isDeleted()) {
@@ -144,6 +144,73 @@ public abstract class Sessions {
 		}
 	}
 
+	/**
+	 * Deletes the request's session, for example when the user logs out, and
+	 * clears the session cookie on the client. Waits if another request has
+	 * the session open for writing. If this request has it open, that handle
+	 * becomes read-only and empty.
+	 * <p>
+	 * If the response headers were already sent, the session is still deleted
+	 * but the client keeps its now useless cookie.
+	 *
+	 * @param request the request
+	 */
+	public void deleteSession(HTTPRequest request) {
+		deleteCurrent(request);
+		if (request.cookies().containsKey(cookieName(request)) && !request.alreadyWrote()) {
+			setCookie(request, "", 0L);
+		}
+	}
+
+	/**
+	 * Deletes the request's session and starts a new one with a new ID, for
+	 * example when the user logs in, so that a session ID someone else may
+	 * have learned before the login is useless. If this request has the old
+	 * session open, that handle becomes read-only and empty.
+	 *
+	 * @param request the request
+	 * @return a writable handle on the new session
+	 * @throws IllegalStateException if the response headers were already
+	 * sent, so the new session's cookie can't be set
+	 */
+	@SuppressWarnings("deprecation")
+	public SessionHandle resetSession(HTTPRequest request) {
+		checkCanSetCookie(request);
+		deleteCurrent(request);
+		Session session = newSession();
+		setCookie(request, session.getSessionId(), -1L);
+		session.exclusive.acquireUninterruptibly();
+		SessionHandle handle = new SessionHandle(this, request, session, true);
+		openHandles.put(request, handle);
+		request.addCleanupTask(handle::close);
+		return handle;
+	}
+
+	/**
+	 * Deletes the request's current session, if it has one, while holding
+	 * its lock.
+	 */
+	@SuppressWarnings("deprecation")
+	private void deleteCurrent(HTTPRequest request) {
+		SessionHandle open = openHandles.get(request);
+		if (open != null) {
+			// this request already holds the lock
+			open.getSession().delete();
+			open.sessionDeleted();
+			return;
+		}
+		Session session = currentSession(request);
+		if (session == null) {
+			return;
+		}
+		session.exclusive.acquireUninterruptibly();
+		try {
+			session.delete();
+		} finally {
+			session.exclusive.release();
+		}
+	}
+
 	void handleReleased(HTTPRequest request, SessionHandle handle) {
 		openHandles.remove(request, handle);
 	}
@@ -167,7 +234,12 @@ public abstract class Sessions {
 		}
 	}
 
-	private void setCookie(HTTPRequest request, String sessionId) {
+	/**
+	 * Sets the session cookie.
+	 *
+	 * @param maxAge the Max-Age in seconds, or -1 to leave it out
+	 */
+	private void setCookie(HTTPRequest request, String sessionId, long maxAge) {
 		checkCanSetCookie(request);
 		StringBuilder cookie = new StringBuilder();
 		cookie.append(cookieName(request)).append('=').append(sessionId);
@@ -177,6 +249,9 @@ public abstract class Sessions {
 			if (request.isSecure()) {
 				cookie.append(" Secure;");
 			}
+			if (maxAge >= 0L) {
+				cookie.append(" Max-Age=").append(maxAge).append(';');
+			}
 		} else {
 			cookie.append("; Path=/; HttpOnly");
 			if (request.isSecure()) {
@@ -184,6 +259,9 @@ public abstract class Sessions {
 			}
 			if (sameSite != null) {
 				cookie.append("; SameSite=").append(sameSite.getValue());
+			}
+			if (maxAge >= 0L) {
+				cookie.append("; Max-Age=").append(maxAge);
 			}
 		}
 		request.response.addHeader("Set-Cookie", cookie.toString());

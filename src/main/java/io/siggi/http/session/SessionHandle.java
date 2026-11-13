@@ -150,6 +150,23 @@ public final class SessionHandle implements AutoCloseable {
 	}
 
 	/**
+	 * Called with the session's lock held by this handle, after the session
+	 * was deleted: releases the lock and leaves the handle empty.
+	 */
+	void sessionDeleted() {
+		synchronized (this) {
+			if (!writable) {
+				copy = Collections.emptyMap();
+				return;
+			}
+			copy = Collections.emptyMap();
+			writable = false;
+			session.exclusive.release();
+		}
+		sessions.handleReleased(request, this);
+	}
+
+	/**
 	 * Saves the session and releases its lock, the same as
 	 * {@link #downgrade()}. The values can still be read afterwards. Safe to
 	 * call more than once, and on a read-only handle.
