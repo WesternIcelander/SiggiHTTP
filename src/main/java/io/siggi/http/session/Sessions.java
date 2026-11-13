@@ -28,10 +28,34 @@ public abstract class Sessions {
 		this.legacy = builder.legacy;
 	}
 
+	/**
+	 * Creates Sessions kept in memory.
+	 *
+	 * @param expireTime how long a session lasts without being used, in
+	 * milliseconds
+	 * @return the Sessions
+	 * @deprecated Use {@link SessionsBuilder} instead. Sessions made this way
+	 * keep the old session cookie, without SameSite, and take its name from
+	 * the HTTPServer.
+	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public static Sessions create(long expireTime) {
 		return create(expireTime, null);
 	}
 
+	/**
+	 * Creates Sessions kept in files in a directory, or in memory if the
+	 * directory is null.
+	 *
+	 * @param expireTime how long a session lasts without being used, in
+	 * milliseconds
+	 * @param directory the directory, or null to keep sessions in memory
+	 * @return the Sessions
+	 * @deprecated Use {@link SessionsBuilder} instead. Sessions made this way
+	 * keep the old session cookie, without SameSite, and take its name from
+	 * the HTTPServer.
+	 */
+	@Deprecated(since = "1.11", forRemoval = true)
 	public static Sessions create(long expireTime, File directory) {
 		SessionsBuilder builder = new SessionsBuilder();
 		// The old methods didn't check the expire time, so don't start now
@@ -239,7 +263,7 @@ public abstract class Sessions {
 	}
 
 	private String cookieName(HTTPRequest request) {
-		return legacy ? request.server.getSessionCookieName() : cookieName;
+		return legacy ? request.server().getSessionCookieName() : cookieName;
 	}
 
 	/**

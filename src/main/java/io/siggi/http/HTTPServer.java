@@ -472,6 +472,7 @@ public final class HTTPServer {
 		}
 	}
 
+	@SuppressWarnings("removal") // the default keeps the old cookie
 	private Sessions sessions = Sessions.create(3600000L);
 
 	private final File tmpDir;
