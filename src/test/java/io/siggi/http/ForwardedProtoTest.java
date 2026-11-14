@@ -106,9 +106,7 @@ class ForwardedProtoTest {
 	 */
 	private void startServer(String peer, String... trusted) throws IOException {
 		HTTPServer server = new HTTPServerBuilder().build();
-		for (io.siggi.http.iphelper.IP ip : server.getTrustedIPs()) {
-			server.untrustIP(ip.toString());
-		}
+		server.clearTrustedIPs();
 		for (String range : trusted) {
 			server.trustIP(range);
 		}

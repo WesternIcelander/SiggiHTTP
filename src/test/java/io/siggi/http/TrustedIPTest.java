@@ -1,6 +1,5 @@
 package io.siggi.http;
 
-import io.siggi.http.iphelper.IP;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -11,9 +10,7 @@ class TrustedIPTest {
 
 	private static HTTPServer serverTrusting(String... ranges) {
 		HTTPServer server = new HTTPServerBuilder().build();
-		for (IP ip : server.getTrustedIPs()) {
-			server.untrustIP(ip.toString());
-		}
+		server.clearTrustedIPs();
 		for (String range : ranges) {
 			server.trustIP(range);
 		}
@@ -90,5 +87,19 @@ class TrustedIPTest {
 	@Test
 	void invalidAddressThrows() {
 		assertThrows(IllegalArgumentException.class, () -> serverTrusting().isIPTrusted("not-an-ip"));
+	}
+
+	@Test
+	void clearTrustedIPsRemovesTheDefaults() {
+		HTTPServer server = new HTTPServerBuilder().build();
+		server.clearTrustedIPs();
+		assertTrue(server.getTrustedIPs().isEmpty());
+		assertFalse(server.isIPTrusted("10.0.0.1"));
+		assertFalse(server.isIPTrusted("172.16.0.1"));
+		assertFalse(server.isIPTrusted("192.168.0.1"));
+		assertFalse(server.isIPTrusted("127.0.0.1"));
+		server.trustIP("10.1.0.0/16");
+		assertTrue(server.isIPTrusted("10.1.2.3"));
+		assertFalse(server.isIPTrusted("10.2.0.1"));
 	}
 }

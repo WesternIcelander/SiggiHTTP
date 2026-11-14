@@ -472,6 +472,24 @@ public final class HTTPServer {
 		}
 	}
 
+	/**
+	 * Removes every trusted address and range, including the defaults
+	 * (127.0.0.1, 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16), so only
+	 * those added afterwards with {@link #trustIP(String)} are trusted.
+	 * <p>
+	 * Forwarding headers are still accepted from loopback addresses, and from
+	 * Cloudflare's addresses when its address list is present, since those
+	 * are checked separately.
+	 */
+	public void clearTrustedIPs() {
+		trustedIPWrite.lock();
+		try {
+			trustedIPs.clear();
+		} finally {
+			trustedIPWrite.unlock();
+		}
+	}
+
 	@SuppressWarnings("removal") // the default keeps the old cookie
 	private Sessions sessions = Sessions.create(3600000L);
 
