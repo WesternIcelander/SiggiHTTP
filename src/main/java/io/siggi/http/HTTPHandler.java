@@ -14,7 +14,6 @@ import io.siggi.http.io.ToggleableBufferedOutputStream;
 import io.siggi.http.io.WriteFailureTrackingOutputStream;
 import io.siggi.http.registry.HTTPResponderRegistry;
 import io.siggi.http.util.CaseInsensitiveHashMap;
-import io.siggi.http.util.CloudFlare;
 import io.siggi.http.util.HTMLUtils;
 import io.siggi.http.util.Util;
 import java.io.BufferedOutputStream;
@@ -830,14 +829,14 @@ final class HTTPHandler {
 								}
 								inetAddress = forwardedAddress;
 								ip = inetAddress.getHostAddress();
-								if (CloudFlare.isCloudFlare(ip) || server.isIPTrusted(ip)) {
+								if (server.isCloudflare(ip) || server.isIPTrusted(ip)) {
 									continue;
 								}
 								break;
 							}
 						}
 					} else if (key.equalsIgnoreCase("CF-Connecting-IP")) { // CloudFlare gateway
-						if (CloudFlare.isCloudFlare(realInetAddress) || server.isIPTrusted(realInetAddress.getHostAddress())) {
+						if (server.isCloudflare(realInetAddress.getHostAddress()) || server.isIPTrusted(realInetAddress.getHostAddress())) {
 							InetAddress connectingAddress = Util.parseIPLiteral(val);
 							if (connectingAddress != null) {
 								inetAddress = connectingAddress;
@@ -1376,7 +1375,7 @@ final class HTTPHandler {
 	 * Cloudflare address, or a trusted IP.
 	 */
 	boolean isNextHopTrustedProxy() {
-		return realInetAddress.isLoopbackAddress() || CloudFlare.isCloudFlare(realInetAddress) || server.isIPTrusted(realInetAddress.getHostAddress());
+		return realInetAddress.isLoopbackAddress() || server.isCloudflare(realInetAddress.getHostAddress()) || server.isIPTrusted(realInetAddress.getHostAddress());
 	}
 
 	final HTTPServer server;

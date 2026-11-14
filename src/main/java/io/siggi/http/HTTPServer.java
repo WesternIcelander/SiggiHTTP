@@ -4,6 +4,7 @@ import io.siggi.http.defaultresponders.DefaultResponder;
 import io.siggi.http.iphelper.IP;
 import io.siggi.http.registry.HTTPResponderRegistry;
 import io.siggi.http.session.Sessions;
+import io.siggi.http.util.CloudFlare;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +21,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Predicate;
 
 public final class HTTPServer {
 
@@ -477,17 +479,36 @@ public final class HTTPServer {
 	 * (127.0.0.1, 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16), so only
 	 * those added afterwards with {@link #trustIP(String)} are trusted.
 	 * <p>
-	 * Forwarding headers are still accepted from loopback addresses, and from
-	 * Cloudflare's addresses when its address list is present, since those
-	 * are checked separately.
+	 * This also stops this server trusting Cloudflare's addresses from
+	 * {@code cloudflare-ips.txt}; to trust Cloudflare again, add its ranges
+	 * with {@link #trustIP(String)}. Forwarding headers are still accepted
+	 * from loopback addresses, which is set separately.
 	 */
 	public void clearTrustedIPs() {
 		trustedIPWrite.lock();
 		try {
 			trustedIPs.clear();
+			cloudflareTrusted = false;
 		} finally {
 			trustedIPWrite.unlock();
 		}
+	}
+
+	// Whether Cloudflare's ranges, from the deprecated CloudFlare class,
+	// count as trusted proxies. clearTrustedIPs() turns it off.
+	private volatile boolean cloudflareTrusted = true;
+
+	// Looks up Cloudflare's ranges. Tests replace it, because CloudFlare only
+	// reads its list from the working directory when the class loads.
+	@SuppressWarnings("removal")
+	volatile Predicate<String> cloudflareRanges = CloudFlare::isCloudFlare;
+
+	/**
+	 * Returns whether the address is one of Cloudflare's and this server
+	 * still trusts Cloudflare.
+	 */
+	boolean isCloudflare(String ip) {
+		return cloudflareTrusted && cloudflareRanges.test(ip);
 	}
 
 	@SuppressWarnings("removal") // the default keeps the old cookie
