@@ -74,7 +74,13 @@ class TrustedProxyTest {
 	void cloudflareIsTrustedByDefault() throws IOException {
 		startServer(CLOUDFLARE_PEER);
 		assertEquals("198.51.100.7 true direct.example", get(HEADERS));
-		assertEquals("198.51.100.8 false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
+	}
+
+	@Test
+	void cfConnectingIpIsIgnoredEvenFromCloudflare() throws IOException {
+		// Cloudflare also sends X-Forwarded-For, which is what's used
+		startServer(CLOUDFLARE_PEER);
+		assertEquals(CLOUDFLARE_PEER + " false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
 	}
 
 	@Test
@@ -86,11 +92,25 @@ class TrustedProxyTest {
 	}
 
 	@Test
-	void cloudflareCanBeTrustedAgainWithTrustIP() throws IOException {
+	void cloudflareRangesAddedWithTrustIPAreAnOrdinaryTrustedProxy() throws IOException {
 		startServer(CLOUDFLARE_PEER);
 		server.clearTrustedIPs();
 		server.trustIP(CLOUDFLARE_PEER);
-		assertEquals("198.51.100.8 false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
+		assertEquals("198.51.100.7 true forwarded.example", get(HEADERS));
+		assertEquals(CLOUDFLARE_PEER + " false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
+	}
+
+	@Test
+	void trustedProxyCannotSetCfConnectingIp() throws IOException {
+		// a trusted proxy that isn't Cloudflare may pass on the client's own header
+		startServer("10.0.0.1");
+		assertEquals("10.0.0.1 false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
+	}
+
+	@Test
+	void loopbackProxyCannotSetCfConnectingIp() throws IOException {
+		startServer("127.0.0.1");
+		assertEquals("127.0.0.1 false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
 	}
 
 	@Test

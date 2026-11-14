@@ -835,14 +835,6 @@ final class HTTPHandler {
 								break;
 							}
 						}
-					} else if (key.equalsIgnoreCase("CF-Connecting-IP")) { // CloudFlare gateway
-						if (server.isCloudflare(realInetAddress.getHostAddress()) || server.isIPTrusted(realInetAddress.getHostAddress())) {
-							InetAddress connectingAddress = Util.parseIPLiteral(val);
-							if (connectingAddress != null) {
-								inetAddress = connectingAddress;
-								ip = inetAddress.getHostAddress();
-							}
-						}
 					} else if (key.equalsIgnoreCase("X-Forwarded-Host")) {
 						if (server.isIPTrusted(realInetAddress.getHostAddress())) {
 							forceHost = val;
