@@ -815,7 +815,7 @@ final class HTTPHandler {
 			for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
 				String key = entry.getKey();
 				for (String val : entry.getValue()) {
-					if (key.equalsIgnoreCase("X-Forwarded-For")) { // Loopback gateway
+					if (key.equalsIgnoreCase("X-Forwarded-For")) {
 						if (isNextHopTrustedProxy()) {
 							String[] forwardedFor = val.split(",");
 							for (int i = 0; i < forwardedFor.length; i++) {
@@ -843,8 +843,8 @@ final class HTTPHandler {
 								ip = inetAddress.getHostAddress();
 							}
 						}
-					} else if (key.equalsIgnoreCase("X-Forwarded-Host")) { // Loopback gateway
-						if (realInetAddress.isLoopbackAddress() || server.isIPTrusted(realInetAddress.getHostAddress())) {
+					} else if (key.equalsIgnoreCase("X-Forwarded-Host")) {
+						if (server.isIPTrusted(realInetAddress.getHostAddress())) {
 							forceHost = val;
 						}
 					} else if (key.equalsIgnoreCase("Cookie")) {
@@ -1371,11 +1371,11 @@ final class HTTPHandler {
 
 	/**
 	 * Whether the socket peer may set the forwarding headers that describe
-	 * the client (X-Forwarded-For and X-Forwarded-Proto): loopback, a
-	 * Cloudflare address, or a trusted IP.
+	 * the client (X-Forwarded-For and X-Forwarded-Proto): a trusted IP, which
+	 * by default includes loopback, or a Cloudflare address.
 	 */
 	boolean isNextHopTrustedProxy() {
-		return realInetAddress.isLoopbackAddress() || server.isCloudflare(realInetAddress.getHostAddress()) || server.isIPTrusted(realInetAddress.getHostAddress());
+		return server.isIPTrusted(realInetAddress.getHostAddress()) || server.isCloudflare(realInetAddress.getHostAddress());
 	}
 
 	final HTTPServer server;

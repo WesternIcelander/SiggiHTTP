@@ -28,6 +28,10 @@ class TrustedIPTest {
 		assertTrue(server.isIPTrusted("192.168.0.1"));
 		assertTrue(server.isIPTrusted("192.168.200.1"));
 		assertTrue(server.isIPTrusted("127.0.0.1"));
+		assertTrue(server.isIPTrusted("127.0.0.2"));
+		assertTrue(server.isIPTrusted("127.255.255.255"));
+		assertTrue(server.isIPTrusted("::1"));
+		assertTrue(server.isIPTrusted("0:0:0:0:0:0:0:1"));
 	}
 
 	@Test
@@ -37,7 +41,8 @@ class TrustedIPTest {
 		assertFalse(server.isIPTrusted("172.15.255.255"));
 		assertFalse(server.isIPTrusted("172.32.0.0"));
 		assertFalse(server.isIPTrusted("192.169.0.1"));
-		assertFalse(server.isIPTrusted("127.0.0.2"));
+		assertFalse(server.isIPTrusted("128.0.0.1"));
+		assertFalse(server.isIPTrusted("::2"));
 		assertFalse(server.isIPTrusted("8.8.8.8"));
 	}
 
@@ -98,6 +103,7 @@ class TrustedIPTest {
 		assertFalse(server.isIPTrusted("172.16.0.1"));
 		assertFalse(server.isIPTrusted("192.168.0.1"));
 		assertFalse(server.isIPTrusted("127.0.0.1"));
+		assertFalse(server.isIPTrusted("::1"));
 		server.trustIP("10.1.0.0/16");
 		assertTrue(server.isIPTrusted("10.1.2.3"));
 		assertFalse(server.isIPTrusted("10.2.0.1"));

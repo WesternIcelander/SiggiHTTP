@@ -84,8 +84,15 @@ class ForwardedProtoTest {
 	}
 
 	@Test
-	void loopbackProxyCanReportHttps() throws IOException {
+	void loopbackIsOnlyTrustedThroughTheList() throws IOException {
+		// startServer clears the trusted IPs, loopback included
 		startServer("127.0.0.1");
+		assertEquals("false", isSecure("https"));
+	}
+
+	@Test
+	void trustedLoopbackProxyCanReportHttps() throws IOException {
+		startServer("127.0.0.1", "127.0.0.0/8");
 		assertEquals("true", isSecure("https"));
 		assertEquals("false", isSecure("http"));
 	}

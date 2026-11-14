@@ -286,8 +286,9 @@ public class HTTPRequest {
 	/**
 	 * Returns whether the client connected over HTTPS. Behind a reverse proxy,
 	 * this is what the proxy reports in X-Forwarded-Proto, but that header is
-	 * only honoured when the connection comes from a trusted proxy: loopback,
-	 * Cloudflare, or an address trusted with {@link HTTPServer#trustIP(String)}.
+	 * only honoured when the connection comes from a trusted proxy: a trusted
+	 * IP (see {@link HTTPServer#trustIP(String)}; loopback is trusted by
+	 * default), or Cloudflare.
 	 * Otherwise it's whether this connection itself uses TLS.
 	 *
 	 * @return true if the request was made over HTTPS

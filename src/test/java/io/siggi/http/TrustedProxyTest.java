@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Which peers may set the forwarding headers: Cloudflare and loopback,
- * besides the trusted IPs.
+ * Which peers may set the forwarding headers: the trusted IPs, loopback
+ * among them by default, and Cloudflare.
  */
 class TrustedProxyTest {
 
@@ -91,5 +91,32 @@ class TrustedProxyTest {
 		server.clearTrustedIPs();
 		server.trustIP(CLOUDFLARE_PEER);
 		assertEquals("198.51.100.8 false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
+	}
+
+	@Test
+	void loopbackIsTrustedByDefault() throws IOException {
+		startServer("127.0.0.2");
+		assertEquals("198.51.100.7 true forwarded.example", get(HEADERS));
+	}
+
+	@Test
+	void ipv6LoopbackIsTrustedByDefault() throws IOException {
+		startServer("::1");
+		assertEquals("198.51.100.7 true forwarded.example", get(HEADERS));
+	}
+
+	@Test
+	void loopbackCanBeUntrustedThroughTheList() throws IOException {
+		startServer("127.0.0.1");
+		server.untrustIP("127.0.0.0/8");
+		assertEquals("127.0.0.1 false direct.example", get(HEADERS));
+		assertEquals("127.0.0.1 false direct.example", get("CF-Connecting-IP: 198.51.100.8\r\n"));
+	}
+
+	@Test
+	void clearTrustedIPsUntrustsLoopback() throws IOException {
+		startServer("::1");
+		server.clearTrustedIPs();
+		assertEquals("0:0:0:0:0:0:0:1 false direct.example", get(HEADERS));
 	}
 }

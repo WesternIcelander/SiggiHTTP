@@ -438,7 +438,8 @@ public final class HTTPServer {
 	private void addDefaultTrustedIPs() {
 		trustedIPWrite.lock();
 		try {
-			trustedIPs.add(IP.getIP("127.0.0.1"));
+			trustedIPs.add(IP.getIP("127.0.0.0/8"));
+			trustedIPs.add(IP.getIP("::1"));
 			trustedIPs.add(IP.getIP("10.0.0.0/8"));
 			trustedIPs.add(IP.getIP("172.16.0.0/12"));
 			trustedIPs.add(IP.getIP("192.168.0.0/16"));
@@ -476,13 +477,13 @@ public final class HTTPServer {
 
 	/**
 	 * Removes every trusted address and range, including the defaults
-	 * (127.0.0.1, 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16), so only
-	 * those added afterwards with {@link #trustIP(String)} are trusted.
+	 * (the loopback addresses 127.0.0.0/8 and ::1, and the private ranges
+	 * 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16), so only those added
+	 * afterwards with {@link #trustIP(String)} are trusted.
 	 * <p>
 	 * This also stops this server trusting Cloudflare's addresses from
 	 * {@code cloudflare-ips.txt}; to trust Cloudflare again, add its ranges
-	 * with {@link #trustIP(String)}. Forwarding headers are still accepted
-	 * from loopback addresses, which is set separately.
+	 * with {@link #trustIP(String)}.
 	 */
 	public void clearTrustedIPs() {
 		trustedIPWrite.lock();

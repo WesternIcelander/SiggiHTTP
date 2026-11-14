@@ -10,8 +10,8 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 
 /**
- * A real loopback connection that reports a different peer address, since
- * a test client on loopback is always a trusted proxy.
+ * A real loopback connection that reports a different peer address, so a
+ * test can act as a client from any address.
  */
 final class PeerAddressSocket extends Socket {
 	private final Socket socket;
